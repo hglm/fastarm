@@ -28,6 +28,17 @@
 
 #include "fastarm.h"
 
+/*
+ * When ALIGN_DESTINATION_WRITES_MAIN_PART is defined, unaligned destination write access will
+ * be avoided for the main part of the destination buffer. When is not defined, a faster copying
+ * function is used but it leaves it the processor to handle unaligned writes.
+ *
+ * Note that even with this option, a small part of the destination buffer at the beginning
+ * or end may still be written to with unaligned writes.
+ */
+
+#define ALIGN_DESTINATION_WRITES_MAIN_PART
+
 typedef void (*fastarm_tail_func_type)(const uint8_t *src, uint8_t *dest, int n);
 
 typedef void (*fastarm_copy_chunks_unaligned_func_type)(const uint8_t *src, uint8_t *dest, int chunks);
@@ -338,7 +349,11 @@ static void fastarm_memcpy_source_word_aligned(void *dest, const void *src, int 
     uintptr_t alignshift_dest = (uintptr_t)dest & 31;
     int chunks = n >> 5;
     if (chunks > 0)
+#ifdef ALIGN_DESTINATION_WRITES_MAIN_PART
         fastarm_copy_chunks_unaligned_func[alignshift_dest & 3](src, dest, chunks);
+#else
+        copy_chunks_aligned(src, dest, chunks);
+#endif
     // Accept unaligned destination access for the tail.
     int tail_size = n & 31;
     if (tail_size !=  0)
@@ -418,7 +433,11 @@ copy_chunks: ;
     uintptr_t alignshift_dest = (uintptr_t)dest & 31;
     int chunks = n >> 5;
     if (chunks > 0)
+#ifdef ALIGN_DESTINATION_WRITES_MAIN_PART
         fastarm_copy_chunks_unaligned_func[alignshift_dest & 3](src, dest, chunks);
+#else
+        copy_chunks_aligned(src, dest, chunks);
+#endif
     // Accept unaligned destination access for the tail.
     int tail_size = n & 31;
     if (tail_size != 0)

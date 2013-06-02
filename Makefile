@@ -6,7 +6,7 @@ libfastarm.a : fastarm.o
 	rm -f libfastarm.a
 	ar r libfastarm.a fastarm.o
 
-benchmark : benchmark.o
+benchmark : benchmark.o /usr/include/fastarm.h
 	gcc $(CFLAGS) benchmark.o -o benchmark -lrt -lfastarm
 
 install : libfastarm.a fastarm.h
