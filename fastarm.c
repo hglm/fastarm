@@ -25,7 +25,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <assert.h>
 
 #include "fastarm.h"
 
@@ -405,12 +404,10 @@ static void fastarm_memcpy_source_not_word_aligned(void *dest, const void *src, 
         }
         /* Accept unaligned access to destination. */
         if (n <= head_size) {
-           assert(n >= 0 && n <= 31);
            fastarm_tail_func[n]((uint8_t *)src, (uint8_t *)dest, n);
            return;
         }
         ARM_PRELOAD(src, 32);
-        assert(head_size >= 0 && head_size <= 31);
         fastarm_tail_func[head_size]((uint8_t *)src, (uint8_t *)dest, head_size);
         src = (uint8_t *)src + head_size;
         dest = (uint8_t *)dest + head_size;

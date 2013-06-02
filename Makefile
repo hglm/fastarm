@@ -1,4 +1,4 @@
-CFLAGS = -std=gnu99 -O -ggdb -Wall
+CFLAGS = -std=gnu99 -O2 -Wall
 
 all : libfastarm.a benchmark
 
