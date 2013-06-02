@@ -177,9 +177,9 @@ static void do_test(const char *name, void (*test_func)(int), int bytes) {
     /* Warm-up. */
     int nu_iterations;
     if (bytes >= 64) 
-        nu_iterations = (16 * 1024 * 1024) / bytes;
+        nu_iterations = (256 * 1024 * 1024) / bytes;
     else
-        nu_iterations = 1024 * 1024 / 4;
+        nu_iterations = 1024 * 1024 * 4;
     for (int i = 0; i < nu_iterations; i++)
        test_func(i);
     double start_time = get_time();
