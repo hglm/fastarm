@@ -25,3 +25,6 @@ benchmark.o : benchmark.c
 
 .c.o : 
 	$(CC) -c $(CFLAGS) $< -o $@
+
+.c.s :
+	$(CC) -S $(CFLAGS) $< -o $@

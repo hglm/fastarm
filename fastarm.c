@@ -115,14 +115,22 @@ static const fastarm_word_align_func_type fastarm_word_align_func[4];
  */
 
 static void copy_chunks_aligned(const uint8_t *src, uint8_t *dest, int chunks) {
-    do {
+    while (chunks > 4) {
         ARM_LDMIA_R4_R7(src);
         ARM_LDMIA_R8_R11(src);
         ARM_STMIA_R4_R7(dest);
         ARM_PRELOAD(src, 128);
         ARM_STMIA_R8_R11(dest);
         chunks--;
-    }  while (chunks != 0);
+    }
+    /* Don't do preload for the last few chunks. */
+    while (chunks > 0) {
+        ARM_LDMIA_R4_R7(src);
+        ARM_LDMIA_R8_R11(src);
+        ARM_STMIA_R4_R7(dest);
+        ARM_STMIA_R8_R11(dest);
+        chunks--;
+    }
 }
 
 #ifdef USE_ARM_OPTIMIZED_UNALIGNED_COPY
@@ -161,7 +169,7 @@ static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, in
        ARM_OR_WITH_LEFT_SHIFT(v6, v7, 8);
        v7 >>= 24;
        ARM_STMIA_R4_R7_VARS(dest, v0, v1, v2, v3);
-       ARM_PRELOAD(src, 64);
+       ARM_PRELOAD(src, 128);
        ARM_STMIA_R8_R10_VARS(dest, v4, v5, v6);
        *(uint8_t *)(dest) = v7 >> 24;
        dest++;
@@ -202,7 +210,7 @@ static void copy_chunks_unaligned_offset_2(const uint8_t *src, uint8_t *dest, in
        ARM_OR_WITH_LEFT_SHIFT(v6, v7, 16);
        v7 >>= 16;
        ARM_STMIA_R4_R7_VARS(dest, v0, v1, v2, v3);
-       ARM_PRELOAD(src, 64);
+       ARM_PRELOAD(src, 128);
        ARM_STMIA_R8_R10_VARS(dest, v4, v5, v6);
        *(uint16_t *)(dest) = v7 >> 16;
        dest += 2;
@@ -243,7 +251,7 @@ static void copy_chunks_unaligned_offset_3(const uint8_t *src, uint8_t *dest, in
        ARM_OR_WITH_LEFT_SHIFT(v6, v7, 24);
        v7 = v7 >> 8;
        ARM_STMIA_R4_R7_VARS(dest, v0, v1, v2, v3);
-       ARM_PRELOAD(src, 64);
+       ARM_PRELOAD(src, 128);
        ARM_STMIA_R8_R10_VARS(dest, v4, v5, v6);
        *(uint16_t *)(dest) = (uint16_t)(v7 >> 8);
        *(uint8_t *)(dest + 2) = v7 >> 24;
@@ -386,6 +394,59 @@ static void fastarm_memcpy_aligned32_tail(void *dest, const void *src, int n) {
     if (n & 1)
         *(uint8_t *)(destp + i + 4) = *(uint8_t *)(srcp + i);
     return;
+}
+
+/*
+ * Generic tail function with aligned write access.
+ * This functions does not try to avoid unaligned read access.
+ */
+
+static void fastarm_aligned_tail_func(const uint8_t *src, uint8_t *dest, int n) {
+    if (n <= 0)
+        return;
+    if (n == 1) {
+        *dest = *src;
+        return;
+    }
+    uintptr_t word_alignshift_dest = (uintptr_t)dest & 3;
+    if (word_alignshift_dest > 0) {
+        if (word_alignshift_dest == 1) {
+            *dest = *src;
+            if (n == 2) {
+                *(dest + 1) = *(src + 1);
+                return;
+            }
+            *(uint16_t *)(dest + 1) = *(uint16_t *)(src + 1);
+            n -= 3;
+        }
+        else if (word_alignshift_dest == 2) {
+            *(uint16_t *)dest = *(uint16_t *)src;
+            n -= 2;
+        }
+        else {
+            *dest = *src;
+            n--;
+        }
+        if (n == 0)
+            return;
+    }
+    int i = 0;
+    while (i + 8 <= n) {
+        *(uint32_t *)(dest + i) = *(uint32_t *)(src + i);
+        *(uint32_t *)(dest + i + 4) = *(uint32_t *)(src + i + 4);
+        i += 8;
+    }
+    int remaining = n - i;
+    if (remaining & 4) {
+        *(uint32_t *)(dest + i) = *(uint32_t *)(src + i);
+        i += 4;
+    }
+    if (remaining & 2) {
+        *(uint16_t *)(dest + i) = *(uint16_t *)(src + i);
+        i += 2;
+    }
+    if (remaining & 1)
+        *(dest + i) = *(src + i);
 }
 
 static void fastarm_memcpy_source_aligned32(void *dest, const void *src, int n) {
@@ -624,8 +685,8 @@ void *fastarm_memcpy(void *dest, const void *src, int n) {
     if (n <= 12) {
         if (n < 0)
             return dest;
-        // Don't care about alignment. */
-        fastarm_tail_func[n](src, dest, n);
+        // Use a tail function that writes aligned. */
+        fastarm_aligned_tail_func(src, dest, n);
         return dest;
     }
     ARM_PRELOAD(src, 0);
@@ -676,57 +737,6 @@ void *fastarm_memcpy_aligned32(void *dest, const void *src, int n) {
         fastarm_tail_func[tail_size]((uint8_t *)src + chunks * 32,
             (uint8_t *)dest + chunks * 32, tail_size);
     return dest;
-}
-
-/*
- * Generic tail function with aligned write access.
- * This functions does not try to avoid unaligned read access.
- */
-
-static void fastarm_aligned_tail_func(const uint8_t *src, uint8_t *dest, int n) {
-    if (n <= 0)
-        return;
-    if (n == 1) {
-        *dest = *src;
-        return;
-    }
-    uintptr_t word_alignshift_dest = (uintptr_t)dest & 3;
-    if (word_alignshift_dest > 0) {
-        if (word_alignshift_dest == 1) {
-            *dest = *src;
-            if (n == 2) {
-                *(dest + 1) = *(src + 1);
-                return;
-            }
-            *(uint16_t *)(dest + 1) = *(uint16_t *)(src + 1);
-            n -= 3;
-        }
-        else if (word_alignshift_dest == 2) {
-            *(uint16_t *)dest = *(uint16_t *)src;
-            n -= 2;
-        }
-        else {
-            *dest = *src;
-            n--;
-        }
-    }
-    int i = 0;
-    while (i + 8 <= n) {
-        *(uint32_t *)(dest + i) = *(uint32_t *)(src + i);
-        *(uint32_t *)(dest + i + 4) = *(uint32_t *)(src + i + 4);
-        i += 8;
-    }
-    int remaining = n - i;
-    if (remaining & 4) {
-        *(uint32_t *)(dest + i) = *(uint32_t *)(src + i);
-        i += 4;
-    }
-    if (remaining & 2) {
-        *(uint16_t *)(dest + i) = *(uint16_t *)(src + i);
-        i += 2;
-    }
-    if (remaining & 1)
-        *(dest + i) = *(src + i);
 }
 
 #ifndef ALIGN_DESTINATION_WRITES_TAIL
