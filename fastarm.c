@@ -101,6 +101,13 @@ static const fastarm_word_align_func_type fastarm_word_align_func[4];
     asm volatile("stmia %[address]!, {r8-r10}" : [address] "+r" (_address) : \
         "r" (_var0), "r" (_var1), "r" (_var2) : );
 
+#define ARM_SHIFT_RIGHT(_var0, _shift) \
+    asm volatile("lsr %[variable], %[shift]" : [variable] "+r" (_var0) : [shift] "I" (_shift) : );
+
+#define ARM_OR_WITH_LEFT_SHIFT(_var0, _var1, _shift) \
+    asm volatile("orr %[variable], %[variable2], %[variable2], lsl %[shift]" : [variable] "+r" (_var0) : \
+        [variable2] "r" (_var1), [shift] "I" (_shift) : );
+
 /*
  * Optimized ARM assembler copying function. Copies source-aligned chunks of 32 bytes.
  * It is strongly advisable that srclinep is 32-byte aligned and dstlinep is at least
@@ -138,13 +145,20 @@ static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, in
        *(uint8_t *)dest = (uint8_t)v0;
        *(uint16_t *)(dest + 1) = (uint16_t)(v0 >> 8);
        dest += 3;
-       v0 = (v0 >> 24) | (v1 << 8);
-       v1 = (v1 >> 24) | (v2 << 8);
-       v2 = (v2 >> 24) | (v3 << 8);
-       v3 = (v3 >> 24) | (v4 << 8);
-       v4 = (v4 >> 24) | (v5 << 8);
-       v5 = (v5 >> 24) | (v6 << 8);
-       v6 = (v6 >> 24) | (v7 << 8);
+       ARM_SHIFT_RIGHT(v0, 24);
+       ARM_OR_WITH_LEFT_SHIFT(v0, v1, 8);
+       ARM_SHIFT_RIGHT(v1, 24);
+       ARM_OR_WITH_LEFT_SHIFT(v1, v2, 8);
+       ARM_SHIFT_RIGHT(v2, 24);
+       ARM_OR_WITH_LEFT_SHIFT(v2, v3, 8);
+       ARM_SHIFT_RIGHT(v3, 24);
+       ARM_OR_WITH_LEFT_SHIFT(v3, v4, 8);
+       ARM_SHIFT_RIGHT(v4, 24);
+       ARM_OR_WITH_LEFT_SHIFT(v4, v5, 8);
+       ARM_SHIFT_RIGHT(v5, 24);
+       ARM_OR_WITH_LEFT_SHIFT(v5, v6, 8);
+       ARM_SHIFT_RIGHT(v6, 24);
+       ARM_OR_WITH_LEFT_SHIFT(v6, v7, 8);
        v7 >>= 24;
        ARM_STMIA_R4_R7_VARS(dest, v0, v1, v2, v3);
        ARM_PRELOAD(src, 64);
@@ -172,15 +186,21 @@ static void copy_chunks_unaligned_offset_2(const uint8_t *src, uint8_t *dest, in
        ARM_LDMIA_R8_R11_VARS(src, v4, v5, v6, v7);
        *(uint16_t *)dest = (uint16_t)v0;
        dest += 2;
-       v0 = (v0 >> 16) | (v1 << 16);
-       v1 = (v1 >> 16) | (v2 << 16);
-       v2 = (v2 >> 16) | (v3 << 16);
-       v3 = (v3 >> 16) | (v4 << 16);
-       ARM_PRELOAD(src, 64);
-       v4 = (v4 >> 16) | (v5 << 16);
-       v5 = (v5 >> 16) | (v6 << 16);
-       v6 = (v6 >> 16) | (v7 << 16);
-       v7 = v7 >> 16;
+       ARM_SHIFT_RIGHT(v0, 16);
+       ARM_OR_WITH_LEFT_SHIFT(v0, v1, 16);
+       ARM_SHIFT_RIGHT(v1, 16);
+       ARM_OR_WITH_LEFT_SHIFT(v1, v2, 16);
+       ARM_SHIFT_RIGHT(v2, 16);
+       ARM_OR_WITH_LEFT_SHIFT(v2, v3, 16);
+       ARM_SHIFT_RIGHT(v3, 16);
+       ARM_OR_WITH_LEFT_SHIFT(v3, v4, 16);
+       ARM_SHIFT_RIGHT(v4, 16);
+       ARM_OR_WITH_LEFT_SHIFT(v4, v5, 16);
+       ARM_SHIFT_RIGHT(v5, 16);
+       ARM_OR_WITH_LEFT_SHIFT(v5, v6, 16);
+       ARM_SHIFT_RIGHT(v6, 16);
+       ARM_OR_WITH_LEFT_SHIFT(v6, v7, 16);
+       v7 >>= 16;
        ARM_STMIA_R4_R7_VARS(dest, v0, v1, v2, v3);
        ARM_PRELOAD(src, 64);
        ARM_STMIA_R8_R10_VARS(dest, v4, v5, v6);
@@ -207,13 +227,20 @@ static void copy_chunks_unaligned_offset_3(const uint8_t *src, uint8_t *dest, in
        ARM_LDMIA_R8_R11_VARS(src, v4, v5, v6, v7);
        *(uint8_t *)dest = (uint8_t)v0;
        dest++;
-       v0 = (v0 >> 8) | (v1 << 24);
-       v1 = (v1 >> 8) | (v2 << 24);
-       v2 = (v2 >> 8) | (v3 << 24);
-       v3 = (v3 >> 8) | (v4 << 24);
-       v4 = (v4 >> 8) | (v5 << 24);
-       v5 = (v5 >> 8) | (v6 << 24);
-       v6 = (v6 >> 8) | (v7 << 24);
+       ARM_SHIFT_RIGHT(v0, 8);
+       ARM_OR_WITH_LEFT_SHIFT(v0, v1, 24);
+       ARM_SHIFT_RIGHT(v1, 8);
+       ARM_OR_WITH_LEFT_SHIFT(v1, v2, 24);
+       ARM_SHIFT_RIGHT(v2, 8);
+       ARM_OR_WITH_LEFT_SHIFT(v2, v3, 24);
+       ARM_SHIFT_RIGHT(v3, 8);
+       ARM_OR_WITH_LEFT_SHIFT(v3, v4, 24);
+       ARM_SHIFT_RIGHT(v4, 8);
+       ARM_OR_WITH_LEFT_SHIFT(v4, v5, 24);
+       ARM_SHIFT_RIGHT(v5, 8);
+       ARM_OR_WITH_LEFT_SHIFT(v5, v6, 24);
+       ARM_SHIFT_RIGHT(v6, 8);
+       ARM_OR_WITH_LEFT_SHIFT(v6, v7, 24);
        v7 = v7 >> 8;
        ARM_STMIA_R4_R7_VARS(dest, v0, v1, v2, v3);
        ARM_PRELOAD(src, 64);
