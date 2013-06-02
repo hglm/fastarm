@@ -35,6 +35,8 @@
  *
  * Note that even with this option, a small part of the destination buffer at the beginning
  * or end may still be written to with unaligned writes.
+ *
+ * Disabling this option generally results in a big slowdown for unaligned copies.
  */
 
 #define ALIGN_DESTINATION_WRITES_MAIN_PART
@@ -43,9 +45,18 @@
  * When ALIGN_DESTINATION_WRITES_TAIL is defined, unaligned destination write access will
  * be avoided for the beginning and the end of the destination buffer. This includes write access
  * for small size copies.
+ *
+ * Enabling this option generally decreases performance a little.
  */
 
-#define ALIGN_DESTINATION_WRITES_TAIL
+// #define ALIGN_DESTINATION_WRITES_TAIL
+
+/*
+ * When USE_ARM_OPTIMIZED_UNALIGNED_COPY is defined, copying unaligned source and destination
+ * uses the ARM optimized assembler functions.
+ */
+
+// #define USE_ARM_OPTIMIZED_UNALIGNED_COPY
 
 typedef void (*fastarm_tail_func_type)(const uint8_t *src, uint8_t *dest, int n);
 
@@ -91,6 +102,43 @@ static void copy_chunks_aligned(const uint8_t *src, uint8_t *dest, int chunks) {
     }  while (chunks != 0);
 }
 
+#ifdef USE_ARM_OPTIMIZED_UNALIGNED_COPY
+
+/* The destination is offset by 1 byte from word alignment. */
+
+static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, int chunks) {
+    ARM_PRELOAD(src, 32);
+    do {
+       ARM_LDMIA_R4_R7(src);
+       ARM_LDMIA_R8_R11(src);
+       chunks--;
+    }  while (chunks != 0);
+}
+
+/* The destination is offset by 2 bytes from word alignment. */
+
+static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, int chunks) {
+    ARM_PRELOAD(src, 32);
+    do {
+       src += 32;
+       dest += 32;
+       chunks--;
+    }  while (chunks != 0);
+}
+
+/* The destination is offset by 3 bytes from word alignment. */
+
+static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, int chunks) {
+    ARM_PRELOAD(src, 32);
+    do {
+       src += 32;
+       dest += 32;
+       chunks--;
+    }  while (chunks != 0);
+}
+
+#else
+
 /* The destination is offset by 1 byte from word alignment. */
 
 static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, int chunks) {
@@ -100,20 +148,20 @@ static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, in
        uint32_t v1 = *(uint32_t *)(src + 4);
        *(uint8_t *)dest = (uint8_t)v0;
        *(uint16_t *)(dest + 1) = (uint16_t)(v0 >> 8);
-       *(uint32_t *)(dest + 3) = (v0 >> 24) + (v1 << 8);
+       *(uint32_t *)(dest + 3) = (v0 >> 24) | (v1 << 8);
        uint32_t v2 = *(uint32_t *)(src + 8);
        uint32_t v3 = *(uint32_t *)(src + 12);
-       *(uint32_t *)(dest + 7) = (v1 >> 24) + (v2 << 8);
-       *(uint32_t *)(dest + 11) = (v2 >> 24) + (v3 << 8);
+       *(uint32_t *)(dest + 7) = (v1 >> 24) | (v2 << 8);
+       *(uint32_t *)(dest + 11) = (v2 >> 24) | (v3 << 8);
        uint32_t v4 = *(uint32_t *)(src + 16);
        uint32_t v5 = *(uint32_t *)(src + 20);
-       *(uint32_t *)(dest + 15) = (v3 >> 24) + (v4 << 8);
+       *(uint32_t *)(dest + 15) = (v3 >> 24) | (v4 << 8);
        ARM_PRELOAD(src, 64);
-       *(uint32_t *)(dest + 19) = (v4 >> 24) + (v5 << 8);
+       *(uint32_t *)(dest + 19) = (v4 >> 24) | (v5 << 8);
        uint32_t v6 = *(uint32_t *)(src + 24);
        uint32_t v7 = *(uint32_t *)(src + 28);
-       *(uint32_t *)(dest + 23) = (v5 >> 24) + (v6 << 8);
-       *(uint32_t *)(dest + 27) = (v6 >> 24) + (v7 << 8);
+       *(uint32_t *)(dest + 23) = (v5 >> 24) | (v6 << 8);
+       *(uint32_t *)(dest + 27) = (v6 >> 24) | (v7 << 8);
        *(uint8_t *)(dest + 31) = v7 >> 24;
        src += 32;
        dest += 32;
@@ -129,20 +177,20 @@ static void copy_chunks_unaligned_offset_2(const uint8_t *src, uint8_t *dest, in
        uint32_t v0 = *(uint32_t *)src;
        uint32_t v1 = *(uint32_t *)(src + 4);
        *(uint16_t *)dest = (uint16_t)v0;
-       *(uint32_t *)(dest + 2) = (v0 >> 16) + (v1 << 16);
+       *(uint32_t *)(dest + 2) = (v0 >> 16) | (v1 << 16);
        uint32_t v2 = *(uint32_t *)(src + 8);
        uint32_t v3 = *(uint32_t *)(src + 12);
-       *(uint32_t *)(dest + 6) = (v1 >> 16) + (v2 << 16);
-       *(uint32_t *)(dest + 10) = (v2 >> 16) + (v3 << 16);
+       *(uint32_t *)(dest + 6) = (v1 >> 16) | (v2 << 16);
+       *(uint32_t *)(dest + 10) = (v2 >> 16) | (v3 << 16);
        uint32_t v4 = *(uint32_t *)(src + 16);
        uint32_t v5 = *(uint32_t *)(src + 20);
-       *(uint32_t *)(dest + 14) = (v3 >> 16) + (v4 << 16);
+       *(uint32_t *)(dest + 14) = (v3 >> 16) | (v4 << 16);
        ARM_PRELOAD(src, 64);
-       *(uint32_t *)(dest + 18) = (v4 >> 16) + (v5 << 16);
+       *(uint32_t *)(dest + 18) = (v4 >> 16) | (v5 << 16);
        uint32_t v6 = *(uint32_t *)(src + 24);
        uint32_t v7 = *(uint32_t *)(src + 28);
-       *(uint32_t *)(dest + 22) = (v5 >> 16) + (v6 << 16);
-       *(uint32_t *)(dest + 26) = (v6 >> 16) + (v7 << 16);
+       *(uint32_t *)(dest + 22) = (v5 >> 16) | (v6 << 16);
+       *(uint32_t *)(dest + 26) = (v6 >> 16) | (v7 << 16);
        *(uint16_t *)(dest + 30) = v7 >> 16;
        src += 32;
        dest += 32;
@@ -159,19 +207,19 @@ static void copy_chunks_unaligned_offset_3(const uint8_t *src, uint8_t *dest, in
        uint32_t v1 = *(uint32_t *)(src + 4);
        uint32_t v2 = *(uint32_t *)(src + 8);
        *(uint8_t *)dest = (uint8_t)v0;
-       *(uint32_t *)(dest + 1) = (v0 >> 8) + (v1 << 24);
-       *(uint32_t *)(dest + 5) = (v1 >> 8) + (v2 << 24);
+       *(uint32_t *)(dest + 1) = (v0 >> 8) | (v1 << 24);
+       *(uint32_t *)(dest + 5) = (v1 >> 8) | (v2 << 24);
        uint32_t v3 = *(uint32_t *)(src + 12);
        uint32_t v4 = *(uint32_t *)(src + 16);
-       *(uint32_t *)(dest + 9) = (v2 >> 8) + (v3 << 24);
-       *(uint32_t *)(dest + 13) = (v3 >> 8) + (v4 << 24);
+       *(uint32_t *)(dest + 9) = (v2 >> 8) | (v3 << 24);
+       *(uint32_t *)(dest + 13) = (v3 >> 8) | (v4 << 24);
        uint32_t v5 = *(uint32_t *)(src + 20);
        uint32_t v6 = *(uint32_t *)(src + 24);
-       *(uint32_t *)(dest + 17) = (v4 >> 8) + (v5 << 24);
+       *(uint32_t *)(dest + 17) = (v4 >> 8) | (v5 << 24);
        ARM_PRELOAD(src, 64);
-       *(uint32_t *)(dest + 21) = (v5 >> 8) + (v6 << 24);
+       *(uint32_t *)(dest + 21) = (v5 >> 8) | (v6 << 24);
        uint32_t v7 = *(uint32_t *)(src + 28);
-       *(uint32_t *)(dest + 25) = (v6 >> 8) + (v7 << 24);
+       *(uint32_t *)(dest + 25) = (v6 >> 8) | (v7 << 24);
        *(uint16_t *)(dest + 29) = (uint16_t)(v7 >> 8);
        *(uint8_t *)(dest + 31) = v7 >> 24;
        src += 32;
@@ -179,6 +227,8 @@ static void copy_chunks_unaligned_offset_3(const uint8_t *src, uint8_t *dest, in
        chunks--;
     }  while (chunks != 0);
 }
+
+#endif
 
 static const fastarm_copy_chunks_unaligned_func_type fastarm_copy_chunks_unaligned_func[4] = {
     copy_chunks_aligned,
