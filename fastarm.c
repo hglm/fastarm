@@ -30,7 +30,7 @@
 
 /*
  * When ALIGN_DESTINATION_WRITES_MAIN_PART is defined, unaligned destination write access will
- * be avoided for the main part of the destination buffer. When is not defined, a faster copying
+ * be avoided for the main part of the destination buffer. When it is not defined, a faster copying
  * function is used but it leaves it the processor to handle unaligned writes.
  *
  * Note that even with this option, a small part of the destination buffer at the beginning
@@ -38,6 +38,14 @@
  */
 
 #define ALIGN_DESTINATION_WRITES_MAIN_PART
+
+/*
+ * When ALIGN_DESTINATION_WRITES_TAIL is defined, unaligned destination write access will
+ * be avoided for the beginning and the end of the destination buffer. This includes write access
+ * for small size copies.
+ */
+
+#define ALIGN_DESTINATION_WRITES_TAIL
 
 typedef void (*fastarm_tail_func_type)(const uint8_t *src, uint8_t *dest, int n);
 
@@ -505,6 +513,61 @@ void *fastarm_memcpy_aligned32(void *dest, const void *src, int n) {
     return dest;
 }
 
+/*
+ * Generic tail function with aligned write access.
+ * This functions does not try to avoid unaligned read access.
+ */
+
+static void fastarm_aligned_tail_func(const uint8_t *src, uint8_t *dest, int n) {
+    if (n <= 0)
+        return;
+    if (n == 1) {
+        *dest = *src;
+        return;
+    }
+    uintptr_t word_alignshift_dest = (uintptr_t)dest & 3;
+    if (word_alignshift_dest > 0) {
+        if (word_alignshift_dest == 1) {
+            *dest = *src;
+            if (n == 2) {
+                *(dest + 1) = *(src + 1);
+                return;
+            }
+            *(uint16_t *)(dest + 1) = *(uint16_t *)(src + 1);
+            n -= 3;
+        }
+        else if (word_alignshift_dest == 2) {
+            *(uint16_t *)dest = *(uint16_t *)src;
+            n -= 2;
+        }
+        else {
+            *dest = *src;
+            n--;
+        }
+    }
+    int i = 0;
+    while (i + 8 <= n) {
+        *(uint32_t *)(dest + i) = *(uint32_t *)(src + i);
+        *(uint32_t *)(dest + i + 4) = *(uint32_t *)(src + i + 4);
+        i += 8;
+    }
+    int remaining = n - i;
+    if (remaining & 4) {
+        *(uint32_t *)(dest + i) = *(uint32_t *)(src + i);
+        i += 4;
+    }
+    if (remaining & 2) {
+        *(uint16_t *)(dest + i) = *(uint16_t *)(src + i);
+        i += 2;
+    }
+    if (remaining & 1)
+        *(dest + i) = *(src + i);
+}
+
+#ifndef ALIGN_DESTINATION_WRITES_TAIL
+
+/* Tail functions with possibly unaligned write access. */
+
 static void fastarm_tail_func_0(const uint8_t *src, uint8_t *dest, int n) {
     return;
 }
@@ -651,7 +714,43 @@ static void fastarm_tail_func_28_29_30_31(const uint8_t *src, uint8_t *dest, int
     return;
 }
 
+#endif
+
 static const fastarm_tail_func_type fastarm_tail_func[32] = {
+#ifdef ALIGN_DESTINATION_WRITES_TAIL
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func,
+    fastarm_aligned_tail_func
+#else
     fastarm_tail_func_0,
     fastarm_tail_func_1_2_3,
     fastarm_tail_func_1_2_3,
@@ -684,6 +783,7 @@ static const fastarm_tail_func_type fastarm_tail_func[32] = {
     fastarm_tail_func_28_29_30_31,
     fastarm_tail_func_28_29_30_31,
     fastarm_tail_func_28_29_30_31
+#endif
 };
 
 /* Copy one byte so that word alignment is gained. */
