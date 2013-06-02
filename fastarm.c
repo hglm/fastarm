@@ -56,7 +56,7 @@
  * uses the ARM optimized assembler functions.
  */
 
-// #define USE_ARM_OPTIMIZED_UNALIGNED_COPY
+#define USE_ARM_OPTIMIZED_UNALIGNED_COPY
 
 typedef void (*fastarm_tail_func_type)(const uint8_t *src, uint8_t *dest, int n);
 
@@ -85,6 +85,22 @@ static const fastarm_word_align_func_type fastarm_word_align_func[4];
 #define ARM_STMIA_R8_R11(_var) \
     asm volatile("stmia %[address]!, {r8-r11}" : [address] "+r" (_var) : : );
 
+#define ARM_LDMIA_R4_R7_VARS(_address, _var0, _var1, _var2, _var3) \
+    asm volatile("ldmia %[address]!, {r4-r7}" : [address] "+r" (_address), \
+        "=r" (_var0), "=r" (_var1), "=r" (_var2), "=r" (_var3) : : );
+
+#define ARM_LDMIA_R8_R11_VARS(_address, _var0, _var1, _var2, _var3) \
+    asm volatile("ldmia %[address]!, {r8-r11}" : [address] "+r" (_address), \
+        "=r" (_var0), "=r" (_var1), "=r" (_var2), "=r" (_var3) : : );
+
+#define ARM_STMIA_R4_R7_VARS(_address, _var0, _var1, _var2, _var3) \
+    asm volatile("stmia %[address]!, {r4-r7}" : [address] "+r" (_address) : \
+        "r" (_var0), "r" (_var1), "r" (_var2), "r" (_var3) : );
+
+#define ARM_STMIA_R8_R10_VARS(_address, _var0, _var1, _var2) \
+    asm volatile("stmia %[address]!, {r8-r10}" : [address] "+r" (_address) : \
+        "r" (_var0), "r" (_var1), "r" (_var2) : );
+
 /*
  * Optimized ARM assembler copying function. Copies source-aligned chunks of 32 bytes.
  * It is strongly advisable that srclinep is 32-byte aligned and dstlinep is at least
@@ -109,30 +125,102 @@ static void copy_chunks_aligned(const uint8_t *src, uint8_t *dest, int chunks) {
 static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, int chunks) {
     ARM_PRELOAD(src, 32);
     do {
-       ARM_LDMIA_R4_R7(src);
-       ARM_LDMIA_R8_R11(src);
+       register uint32_t v0 asm("r4");
+       register uint32_t v1 asm("r5");
+       register uint32_t v2 asm("r6");
+       register uint32_t v3 asm("r7");
+       register uint32_t v4 asm("r8");
+       register uint32_t v5 asm("r9");
+       register uint32_t v6 asm("r10");
+       register uint32_t v7 asm("r11");
+       ARM_LDMIA_R4_R7_VARS(src, v0, v1, v2, v3);
+       ARM_LDMIA_R8_R11_VARS(src, v4, v5, v6, v7);
+       *(uint8_t *)dest = (uint8_t)v0;
+       *(uint16_t *)(dest + 1) = (uint16_t)(v0 >> 8);
+       dest += 3;
+       v0 = (v0 >> 24) | (v1 << 8);
+       v1 = (v1 >> 24) | (v2 << 8);
+       v2 = (v2 >> 24) | (v3 << 8);
+       v3 = (v3 >> 24) | (v4 << 8);
+       v4 = (v4 >> 24) | (v5 << 8);
+       v5 = (v5 >> 24) | (v6 << 8);
+       v6 = (v6 >> 24) | (v7 << 8);
+       v7 >>= 24;
+       ARM_STMIA_R4_R7_VARS(dest, v0, v1, v2, v3);
+       ARM_PRELOAD(src, 64);
+       ARM_STMIA_R8_R10_VARS(dest, v4, v5, v6);
+       *(uint8_t *)(dest) = v7 >> 24;
+       dest++;
        chunks--;
     }  while (chunks != 0);
 }
 
 /* The destination is offset by 2 bytes from word alignment. */
 
-static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, int chunks) {
+static void copy_chunks_unaligned_offset_2(const uint8_t *src, uint8_t *dest, int chunks) {
     ARM_PRELOAD(src, 32);
     do {
-       src += 32;
-       dest += 32;
+       register uint32_t v0 asm("r4");
+       register uint32_t v1 asm("r5");
+       register uint32_t v2 asm("r6");
+       register uint32_t v3 asm("r7");
+       register uint32_t v4 asm("r8");
+       register uint32_t v5 asm("r9");
+       register uint32_t v6 asm("r10");
+       register uint32_t v7 asm("r11");
+       ARM_LDMIA_R4_R7_VARS(src, v0, v1, v2, v3);
+       ARM_LDMIA_R8_R11_VARS(src, v4, v5, v6, v7);
+       *(uint16_t *)dest = (uint16_t)v0;
+       dest += 2;
+       v0 = (v0 >> 16) | (v1 << 16);
+       v1 = (v1 >> 16) | (v2 << 16);
+       v2 = (v2 >> 16) | (v3 << 16);
+       v3 = (v3 >> 16) | (v4 << 16);
+       ARM_PRELOAD(src, 64);
+       v4 = (v4 >> 16) | (v5 << 16);
+       v5 = (v5 >> 16) | (v6 << 16);
+       v6 = (v6 >> 16) | (v7 << 16);
+       v7 = v7 >> 16;
+       ARM_STMIA_R4_R7_VARS(dest, v0, v1, v2, v3);
+       ARM_PRELOAD(src, 64);
+       ARM_STMIA_R8_R10_VARS(dest, v4, v5, v6);
+       *(uint16_t *)(dest) = v7 >> 16;
+       dest += 2;
        chunks--;
     }  while (chunks != 0);
 }
 
 /* The destination is offset by 3 bytes from word alignment. */
 
-static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, int chunks) {
+static void copy_chunks_unaligned_offset_3(const uint8_t *src, uint8_t *dest, int chunks) {
     ARM_PRELOAD(src, 32);
     do {
-       src += 32;
-       dest += 32;
+       register uint32_t v0 asm("r4");
+       register uint32_t v1 asm("r5");
+       register uint32_t v2 asm("r6");
+       register uint32_t v3 asm("r7");
+       register uint32_t v4 asm("r8");
+       register uint32_t v5 asm("r9");
+       register uint32_t v6 asm("r10");
+       register uint32_t v7 asm("r11");
+       ARM_LDMIA_R4_R7_VARS(src, v0, v1, v2, v3);
+       ARM_LDMIA_R8_R11_VARS(src, v4, v5, v6, v7);
+       *(uint8_t *)dest = (uint8_t)v0;
+       dest++;
+       v0 = (v0 >> 8) | (v1 << 24);
+       v1 = (v1 >> 8) | (v2 << 24);
+       v2 = (v2 >> 8) | (v3 << 24);
+       v3 = (v3 >> 8) | (v4 << 24);
+       v4 = (v4 >> 8) | (v5 << 24);
+       v5 = (v5 >> 8) | (v6 << 24);
+       v6 = (v6 >> 8) | (v7 << 24);
+       v7 = v7 >> 8;
+       ARM_STMIA_R4_R7_VARS(dest, v0, v1, v2, v3);
+       ARM_PRELOAD(src, 64);
+       ARM_STMIA_R8_R10_VARS(dest, v4, v5, v6);
+       *(uint16_t *)(dest) = (uint16_t)(v7 >> 8);
+       *(uint8_t *)(dest + 2) = v7 >> 24;
+       dest += 3;
        chunks--;
     }  while (chunks != 0);
 }
@@ -146,20 +234,20 @@ static void copy_chunks_unaligned_offset_1(const uint8_t *src, uint8_t *dest, in
     do {
        uint32_t v0 = *(uint32_t *)src;
        uint32_t v1 = *(uint32_t *)(src + 4);
+       uint32_t v2 = *(uint32_t *)(src + 8);
+       uint32_t v3 = *(uint32_t *)(src + 12);
+       uint32_t v4 = *(uint32_t *)(src + 16);
+       uint32_t v5 = *(uint32_t *)(src + 20);
+       uint32_t v6 = *(uint32_t *)(src + 24);
+       uint32_t v7 = *(uint32_t *)(src + 28);
        *(uint8_t *)dest = (uint8_t)v0;
        *(uint16_t *)(dest + 1) = (uint16_t)(v0 >> 8);
        *(uint32_t *)(dest + 3) = (v0 >> 24) | (v1 << 8);
-       uint32_t v2 = *(uint32_t *)(src + 8);
-       uint32_t v3 = *(uint32_t *)(src + 12);
        *(uint32_t *)(dest + 7) = (v1 >> 24) | (v2 << 8);
        *(uint32_t *)(dest + 11) = (v2 >> 24) | (v3 << 8);
-       uint32_t v4 = *(uint32_t *)(src + 16);
-       uint32_t v5 = *(uint32_t *)(src + 20);
        *(uint32_t *)(dest + 15) = (v3 >> 24) | (v4 << 8);
        ARM_PRELOAD(src, 64);
        *(uint32_t *)(dest + 19) = (v4 >> 24) | (v5 << 8);
-       uint32_t v6 = *(uint32_t *)(src + 24);
-       uint32_t v7 = *(uint32_t *)(src + 28);
        *(uint32_t *)(dest + 23) = (v5 >> 24) | (v6 << 8);
        *(uint32_t *)(dest + 27) = (v6 >> 24) | (v7 << 8);
        *(uint8_t *)(dest + 31) = v7 >> 24;
