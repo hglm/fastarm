@@ -149,7 +149,6 @@
     ldr     r6, [sp], #4
     strbne  r3, [r0], #1
 
-/*    ldmfd   sp!, {r0, r4} */
     pop     {r0, r4}
 
     bx      lr

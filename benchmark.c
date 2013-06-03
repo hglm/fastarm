@@ -33,7 +33,7 @@
 #include "fastarm.h"
 #include "arm_asm.h"
 
-#define TEST_DURATION 2.0
+#define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
@@ -42,6 +42,7 @@ memcpy_func_type memcpy_func;
 memcpy_func_type standard_memcpy_func, fastarm_memcpy_func, armv5te_memcpy_func;
 uint8_t *buffer_chunk, *buffer_page;
 int *random_buffer_1024;
+double test_duration = DEFAULT_TEST_DURATION;
 
 static void *fastarm_memcpy_wrapper(void *dest, const void *src, size_t n) {
     return fastarm_memcpy(dest, src, n);
@@ -240,7 +241,7 @@ static void do_test(const char *name, void (*test_func)(int), int bytes) {
             test_func(i);
         count++;
         end_time = get_time();
-        if (end_time - start_time >= TEST_DURATION)
+        if (end_time - start_time >= test_duration)
             break;
     }
     double bandwidth = (double)bytes * nu_iterations * count / (1024 * 1024)
@@ -314,9 +315,12 @@ static void usage() {
             printf("Commands:\n"
                 "--list          List test numbers.\n"
                 "--test <number> Perform test <number> only, 5 times for each memcpy variant.\n"
-                "--quick         Perform all tests once for each memcpy variant.\n"
-                "--all           Perform all tests 5 times for each memcpy variant.\n"
-                "--help          Show this message.\n");
+                "--quick         Perform each tests once for each memcpy variant.\n"
+                "--all           Perform each test 5 times for each memcpy variant.\n"
+                "--help          Show this message.\n"
+                "Options:\n"
+                "--duration <n>  Sets the duration of each individual test. Default is 2 seconds.\n"
+                );
 }
 
 int main(int argc, char *argv[]) {
@@ -359,6 +363,16 @@ int main(int argc, char *argv[]) {
         if (strcasecmp(argv[argi], "--help") == 0) {
             usage();
             return 0;
+        }
+        if (argi + 1 < argc && strcasecmp(argv[argi], "--duration") == 0) {
+            double d = strtod(argv[argi + 1], NULL);
+            if (d < 0.1 || d >= 100.0) {
+                printf("Duration out of range.\n");
+                return 1;
+            }
+            test_duration = d;
+            argi += 2;
+            continue;
         }
         printf("Unkown option. Try --help.\n");
         return 1;

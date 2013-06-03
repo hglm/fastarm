@@ -7,8 +7,8 @@ libfastarm.a : fastarm.o
 	rm -f libfastarm.a
 	ar r libfastarm.a fastarm.o
 
-benchmark : benchmark.o arm_asm.o /usr/include/fastarm.h arm_asm.h
-	gcc $(CFLAGS) benchmark.o arm_asm.o -o benchmark -lrt -lfastarm
+benchmark : benchmark.o arm_asm.o libfastarm.a fastarm.h arm_asm.h
+	gcc $(CFLAGS) benchmark.o arm_asm.o -o benchmark libfastarm.a -lrt
 
 benchmarkp : benchmark.c arm_asm.S fastarm.h fastarm.c
 	gcc $(PCFLAGS) benchmark.c arm_asm.S fastarm.c -o benchmarkp -lc -lrt
