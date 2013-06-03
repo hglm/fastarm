@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
 
@@ -203,6 +204,14 @@ static void test_random_mixed_sizes_DRAM_64(int i) {
         1 + (random_buffer_1024[((i * 4 + 2) & (RANDOM_BUFFER_SIZE - 1))] & 63));
 }
 
+static void clear_data_cache() {
+    int val = 0;
+    for (int i = 0; i < 1024 * 1024 * 8; i += 4) {
+        val += buffer_page[1024 * 1024 * 16 + i];
+    }
+    buffer_page[1024 * 1024 * 16] = val;
+}
+
 static void do_test(const char *name, void (*test_func)(int), int bytes) {
     int nu_iterations;
     if (bytes >= 1024) 
@@ -212,8 +221,11 @@ static void do_test(const char *name, void (*test_func)(int), int bytes) {
     else
         nu_iterations = 1024 * 1024 / 2;
     /* Warm-up. */
+    clear_data_cache();
+    double temp_time = get_time();
     for (int i = 0; i < nu_iterations; i++)
        test_func(i);
+    usleep(100000);
     double start_time = get_time();
     double end_time;
     int count = 0;
