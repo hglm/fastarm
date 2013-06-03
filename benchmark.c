@@ -39,6 +39,7 @@
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
 memcpy_func_type memcpy_func;
+memcpy_func_type standard_memcpy_func, fastarm_memcpy_func, armv5te_memcpy_func;
 uint8_t *buffer_chunk, *buffer_page;
 int *random_buffer_1024;
 
@@ -248,22 +249,22 @@ static void do_test(const char *name, void (*test_func)(int), int bytes) {
 }
 
 static void do_test_both(const char *name, void (*test_func)(), int bytes) {
-    memcpy_func = memcpy;
+    memcpy_func = standard_memcpy_func;
     printf("standard memcpy: ");
     do_test(name, test_func, bytes);
-    memcpy_func = fastarm_memcpy_wrapper;
+    memcpy_func = fastarm_memcpy_func;
     printf("fastarm memcpy: ");
     do_test(name, test_func, bytes);
 }
 
 static void do_test_all(const char *name, void (*test_func)(), int bytes) {
-    memcpy_func = memcpy;
+    memcpy_func = standard_memcpy_func;
     printf("standard memcpy: ");
     do_test(name, test_func, bytes);
-    memcpy_func = fastarm_memcpy_wrapper;
+    memcpy_func = fastarm_memcpy_func;
     printf("fastarm memcpy: ");
     do_test(name, test_func, bytes);
-    memcpy_func = armv5te_memcpy_wrapper;
+    memcpy_func = armv5te_memcpy_func;
     printf("armv5te memcpy: ");
     do_test(name, test_func, bytes);
 }
@@ -377,6 +378,17 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < RANDOM_BUFFER_SIZE; i++)
         random_buffer_1024[i] = rand() % 1023;
 
+    standard_memcpy_func = memcpy;
+    if (sizeof(size_t) == sizeof(int)) {
+        fastarm_memcpy_func = fastarm_memcpy;
+        armv5te_memcpy_func = memcpy_armv5te;
+    }
+    else {
+        printf("Using wrappers for fastarm_memcpy and armv5te_memcpy.\n");
+        fastarm_memcpy_func = fastarm_memcpy_wrapper;
+        armv5te_memcpy_func = armv5te_memcpy_wrapper;
+    }
+
     if (command_quick) {
         for (int i = 0; i < NU_TESTS; i++)
            do_test_all(test[i].name, test[i].test_func, test[i].bytes);
@@ -392,15 +404,15 @@ int main(int argc, char *argv[]) {
     }
     for (int t = start_test; t <= end_test; t++) { 
         printf("standard memcpy:\n");
-        memcpy_func = memcpy;
+        memcpy_func = standard_memcpy_func;
         for (int i = 0; i < 5; i++)
             do_test(test[t].name, test[t].test_func, test[t].bytes);
         printf("fastarm memcpy:\n");
-        memcpy_func = fastarm_memcpy_wrapper;
+        memcpy_func = fastarm_memcpy_func;
         for (int i = 0; i < 5; i++)
             do_test(test[t].name, test[t].test_func, test[t].bytes);
         printf("armv5te memcpy:\n");
-        memcpy_func = armv5te_memcpy_wrapper;
+        memcpy_func = armv5te_memcpy_func;
         for (int i = 0; i < 5; i++)
             do_test(test[t].name, test[t].test_func, test[t].bytes);
     }
