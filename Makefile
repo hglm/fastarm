@@ -1,4 +1,5 @@
-CFLAGS = -std=gnu99 -O2 -Wall
+CFLAGS = -std=gnu99 -Ofast -Wall
+PCFLAGS = -std=gnu99 -O -Wall -pg -ggdb
 
 all : libfastarm.a benchmark
 
@@ -9,6 +10,9 @@ libfastarm.a : fastarm.o
 benchmark : benchmark.o /usr/include/fastarm.h
 	gcc $(CFLAGS) benchmark.o -o benchmark -lrt -lfastarm
 
+benchmarkp : benchmark.c fastarm.h fastarm.c
+	gcc $(PCFLAGS) benchmark.c fastarm.c -o benchmarkp -lc -lrt
+
 install : libfastarm.a fastarm.h
 	install -m 0644 fastarm.h /usr/include
 	install -m 0644 libfastarm.a /usr/lib
@@ -18,6 +22,7 @@ clean :
 	rm -f fastarm.o
 	rm -f benchmark
 	rm -f benchmark.o
+	rm -f benchmarkp
 
 fastarm.o : fastarm.c fastarm.h
 

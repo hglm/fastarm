@@ -50,10 +50,40 @@ static double get_time() {
    return (double)ts.tv_sec + (double)ts.tv_nsec / 1000000000.0;
 }
 
+static void test_unaligned_random_3(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
+        buffer_page + 4096 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
+        3);
+}
+
+static void test_unaligned_random_8(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
+        buffer_page + 4096 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
+        8);
+}
+
+static void test_unaligned_random_17(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
+        buffer_page + 4096 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
+        17);
+}
+
+static void test_unaligned_random_30(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
+        buffer_page + 4096 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
+        30);
+}
+
 static void test_unaligned_random_64(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
         buffer_page + 4096 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
         64);
+}
+
+static void test_unaligned_random_137(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
+        buffer_page + 4096 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
+        137);
 }
 
 static void test_unaligned_random_1024(int i) {
@@ -175,10 +205,12 @@ static void test_random_mixed_sizes_DRAM_64(int i) {
 
 static void do_test(const char *name, void (*test_func)(int), int bytes) {
     int nu_iterations;
-    if (bytes >= 64) 
+    if (bytes >= 1024) 
         nu_iterations = (256 * 1024 * 1024) / bytes;
+    else if (bytes >= 64)
+        nu_iterations = (32 * 1024 * 1024) / bytes;
     else
-        nu_iterations = 1024 * 1024 * 4;
+        nu_iterations = 1024 * 1024 / 2;
     /* Warm-up. */
     for (int i = 0; i < nu_iterations; i++)
        test_func(i);
@@ -207,6 +239,47 @@ static void do_test_both(const char *name, void (*test_func)(), int bytes) {
     do_test(name, test_func, bytes);
 }
 
+#define NU_TESTS 25
+
+typedef struct {
+    const char *name;
+    void (*test_func)();
+    int bytes;
+} test_t;
+
+test_t test[NU_TESTS] = {
+    { "3 bytes randomly aligned", test_unaligned_random_3, 3 },
+    { "8 bytes randomly aligned", test_unaligned_random_8, 8 },
+    { "17 bytes randomly aligned", test_unaligned_random_17, 17 },
+    { "30 bytes randomly aligned", test_unaligned_random_30, 30 },
+    { "64 bytes randomly aligned", test_unaligned_random_64, 64 },
+    { "137 bytes randomly aligned", test_unaligned_random_137, 137 },
+    { "1024 bytes randomly aligned", test_unaligned_random_1024, 1024 },
+    { "32768 bytes randomly aligned", test_unaligned_random_32768, 32768 },
+    { "1M bytes randomly aligned", test_unaligned_random_1M, 1024 * 1024 },
+    { "1024 bytes randomly aligned, source aligned with dest",
+        test_source_dest_aligned_random_1024, 1024 },
+    { "32768 bytes randomly aligned, source aligned with dest",
+        test_source_dest_aligned_random_32768, 32768 },
+    { "1M bytes randomly aligned, source aligned with dest",
+        test_source_dest_aligned_random_1M, 1024 *1024 },
+    { "Up to 1024 bytes randomly aligned", test_random_mixed_sizes_1024, 512 },
+    { "Up to 64 bytes randomly aligned", test_random_mixed_sizes_64, 32 },
+    { "Up to 1024 bytes randomly aligned (DRAM)", test_random_mixed_sizes_DRAM_1024,
+       512 },
+    { "Up to 64 bytes randomly aligned (DRAM)", test_random_mixed_sizes_DRAM_64,
+       32 },
+    { "1024 bytes aligned", test_chunk_aligned_1024, 1024 },
+    { "4096 bytes aligned", test_chunk_aligned_4096, 4096 },
+    { "32768 bytes aligned", test_chunk_aligned_32768, 32768 },
+    { "1024 bytes page aligned", test_page_aligned_1024, 1024 },
+    { "4096 bytes page aligned", test_page_aligned_4096, 4096 },
+    { "32768 bytes page aligned", test_page_aligned_32768, 32768 },
+    { "256K bytes page aligned", test_page_aligned_256K, 256 * 1024 },
+    { "1M bytes page aligned", test_page_aligned_1M, 1024 * 1024 },
+    { "8M bytes page aligned", test_page_aligned_8M, 8 * 1024 * 1024 },
+};
+
 int main(int argc, char *argv[]) {
     void *buffer_alloc = malloc(1024 * 1024 * 32);
     buffer_page = (uint8_t *)buffer_alloc + ((4096 - ((uintptr_t)buffer_alloc & 4095))
@@ -217,29 +290,27 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < RANDOM_BUFFER_SIZE; i++)
         random_buffer_1024[i] = rand() % 1023;
 
-    do_test_both("64 bytes randomly aligned", test_unaligned_random_64, 64);
-    do_test_both("1024 bytes randomly aligned", test_unaligned_random_1024, 1024);
-    do_test_both("32768 bytes randomly aligned", test_unaligned_random_32768, 32768);
-    do_test_both("1M bytes randomly aligned", test_unaligned_random_1M, 1024 * 1024);
-    do_test_both("1024 bytes randomly aligned, source aligned with dest",
-        test_source_dest_aligned_random_1024, 1024);
-    do_test_both("32768 bytes randomly aligned, source aligned with dest",
-        test_source_dest_aligned_random_32768, 32768);
-    do_test_both("1M bytes randomly aligned, source aligned with dest",
-        test_source_dest_aligned_random_1M, 1024 *1024);
-    do_test_both("Up to 1024 bytes randomly aligned", test_random_mixed_sizes_1024, 512);
-    do_test_both("Up to 64 bytes randomly aligned", test_random_mixed_sizes_64, 32);
-    do_test_both("Up to 1024 bytes randomly aligned (DRAM)", test_random_mixed_sizes_DRAM_1024,
-       512);
-    do_test_both("Up to 64 bytes randomly aligned (DRAM)", test_random_mixed_sizes_DRAM_64,
-       32);
-    do_test_both("1024 bytes aligned", test_chunk_aligned_1024, 1024);
-    do_test_both("4096 bytes aligned", test_chunk_aligned_4096, 4096);
-    do_test_both("32768 bytes aligned", test_chunk_aligned_32768, 32768);
-    do_test_both("1024 bytes page aligned", test_page_aligned_1024, 1024);
-    do_test_both("4096 bytes page aligned", test_page_aligned_4096, 4096);
-    do_test_both("32768 bytes page aligned", test_page_aligned_32768, 32768);
-    do_test_both("256K bytes page aligned", test_page_aligned_256K, 256 * 1024);
-    do_test_both("1M bytes page aligned", test_page_aligned_1M, 1024 * 1024);
-    do_test_both("8M bytes page aligned", test_page_aligned_8M, 8 * 1024 * 1024);
+    if (argc > 1) {
+        if (argc > 2 && strcasecmp(argv[1], "--test") == 0) {
+            int t = atoi(argv[2]);
+            if (t < 0 || t >= NU_TESTS) {
+                printf("Test out of range.\n");
+                return 1;
+            }
+            memcpy_func = fastarm_memcpy_wrapper;
+            for (int i = 0; i < 5; i++)
+                do_test(test[t].name, test[t].test_func, test[t].bytes);
+            return 0;
+        }
+        if (strcasecmp(argv[1], "--list") == 0) {
+            for (int i = 0; i < NU_TESTS; i++)
+                printf("%3d    %s\n", i, test[i].name);
+            return 0;
+        }
+        printf("Unkown option.\n");
+        return 1;
+    }
+
+    for (int i = 0; i < NU_TESTS; i++)
+        do_test_both(test[i].name, test[i].test_func, test[i].bytes);
 }
