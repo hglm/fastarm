@@ -7,11 +7,11 @@ libfastarm.a : fastarm.o
 	rm -f libfastarm.a
 	ar r libfastarm.a fastarm.o
 
-benchmark : benchmark.o /usr/include/fastarm.h
-	gcc $(CFLAGS) benchmark.o -o benchmark -lrt -lfastarm
+benchmark : benchmark.o arm_asm.o /usr/include/fastarm.h arm_asm.h
+	gcc $(CFLAGS) benchmark.o arm_asm.o -o benchmark -lrt -lfastarm
 
-benchmarkp : benchmark.c fastarm.h fastarm.c
-	gcc $(PCFLAGS) benchmark.c fastarm.c -o benchmarkp -lc -lrt
+benchmarkp : benchmark.c arm_asm.S fastarm.h fastarm.c
+	gcc $(PCFLAGS) benchmark.c arm_asm.S fastarm.c -o benchmarkp -lc -lrt
 
 install : libfastarm.a fastarm.h
 	install -m 0644 fastarm.h /usr/include
@@ -23,13 +23,19 @@ clean :
 	rm -f benchmark
 	rm -f benchmark.o
 	rm -f benchmarkp
+	rm -f arm_asm.o
 
 fastarm.o : fastarm.c fastarm.h
 
 benchmark.o : benchmark.c
 
+arm_asm.o : arm_asm.S
+
 .c.o : 
 	$(CC) -c $(CFLAGS) $< -o $@
+
+.S.o :
+	$(CC) -c -s $(CFLAGS) $< -o $@
 
 .c.s :
 	$(CC) -S $(CFLAGS) $< -o $@

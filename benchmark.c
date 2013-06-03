@@ -31,6 +31,7 @@
 #include <sys/time.h>
 
 #include "fastarm.h"
+#include "arm_asm.h"
 
 #define TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
@@ -43,6 +44,10 @@ int *random_buffer_1024;
 
 static void *fastarm_memcpy_wrapper(void *dest, const void *src, size_t n) {
     return fastarm_memcpy(dest, src, n);
+}
+
+static void *armv5te_memcpy_wrapper(void *dest, const void *src, size_t n) {
+    return memcpy_armv5te(dest, src, n);
 }
 
 static double get_time() {
@@ -251,6 +256,18 @@ static void do_test_both(const char *name, void (*test_func)(), int bytes) {
     do_test(name, test_func, bytes);
 }
 
+static void do_test_all(const char *name, void (*test_func)(), int bytes) {
+    memcpy_func = memcpy;
+    printf("standard memcpy: ");
+    do_test(name, test_func, bytes);
+    memcpy_func = fastarm_memcpy_wrapper;
+    printf("fastarm memcpy: ");
+    do_test(name, test_func, bytes);
+    memcpy_func = armv5te_memcpy_wrapper;
+    printf("armv5te memcpy: ");
+    do_test(name, test_func, bytes);
+}
+
 #define NU_TESTS 25
 
 typedef struct {
@@ -292,7 +309,65 @@ test_t test[NU_TESTS] = {
     { "8M bytes page aligned", test_page_aligned_8M, 8 * 1024 * 1024 },
 };
 
+static void usage() {
+            printf("Commands:\n"
+                "--list          List test numbers.\n"
+                "--test <number> Perform test <number> only, 5 times for each memcpy variant.\n"
+                "--quick         Perform all tests once for each memcpy variant.\n"
+                "--all           Perform all tests 5 times for each memcpy variant.\n"
+                "--help          Show this message.\n");
+}
+
 int main(int argc, char *argv[]) {
+    if (argc == 1) {
+        usage();
+        return 0;
+    }
+    int argi = 1;
+    int command_test = - 1;
+    int command_quick = 0;
+    int command_all = 0;
+    for (;;) {
+        if (argi >= argc)
+            break;
+        if (argi + 1 < argc && strcasecmp(argv[argi], "--test") == 0) {
+            int t = atoi(argv[argi + 1]);
+            if (t < 0 || t >= NU_TESTS) {
+                printf("Test out of range.\n");
+                return 1;
+            }
+            command_test = t;
+            argi += 2;
+            continue;
+        }
+        if (strcasecmp(argv[argi], "--quick") == 0) {
+            command_quick = 1;
+            argi++;
+            continue;
+        }
+        if (strcasecmp(argv[argi], "--all") == 0) {
+            command_all = 1;
+            argi++;
+            continue;
+        }
+        if (strcasecmp(argv[argi], "--list") == 0) {
+            for (int i = 0; i < NU_TESTS; i++)
+                printf("%3d    %s\n", i, test[i].name);
+            return 0;
+        }
+        if (strcasecmp(argv[argi], "--help") == 0) {
+            usage();
+            return 0;
+        }
+        printf("Unkown option. Try --help.\n");
+        return 1;
+    }
+
+    if ((command_test != -1) + command_all + command_quick != 1) {
+        printf("Specify only one of --test, --quick or --all.\n");
+        return 1;
+    }
+
     void *buffer_alloc = malloc(1024 * 1024 * 32);
     buffer_page = (uint8_t *)buffer_alloc + ((4096 - ((uintptr_t)buffer_alloc & 4095))
         & 4095);
@@ -302,27 +377,31 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < RANDOM_BUFFER_SIZE; i++)
         random_buffer_1024[i] = rand() % 1023;
 
-    if (argc > 1) {
-        if (argc > 2 && strcasecmp(argv[1], "--test") == 0) {
-            int t = atoi(argv[2]);
-            if (t < 0 || t >= NU_TESTS) {
-                printf("Test out of range.\n");
-                return 1;
-            }
-            memcpy_func = fastarm_memcpy_wrapper;
-            for (int i = 0; i < 5; i++)
-                do_test(test[t].name, test[t].test_func, test[t].bytes);
-            return 0;
-        }
-        if (strcasecmp(argv[1], "--list") == 0) {
-            for (int i = 0; i < NU_TESTS; i++)
-                printf("%3d    %s\n", i, test[i].name);
-            return 0;
-        }
-        printf("Unkown option.\n");
-        return 1;
+    if (command_quick) {
+        for (int i = 0; i < NU_TESTS; i++)
+           do_test_all(test[i].name, test[i].test_func, test[i].bytes);
+        return 0;
     }
 
-    for (int i = 0; i < NU_TESTS; i++)
-        do_test_both(test[i].name, test[i].test_func, test[i].bytes);
+    int start_test, end_test;
+    start_test = 0;
+    end_test = NU_TESTS - 1;
+    if (command_test != - 1) {
+        start_test = command_test;
+        end_test = command_test;
+    }
+    for (int t = start_test; t <= end_test; t++) { 
+        printf("standard memcpy:\n");
+        memcpy_func = memcpy;
+        for (int i = 0; i < 5; i++)
+            do_test(test[t].name, test[t].test_func, test[t].bytes);
+        printf("fastarm memcpy:\n");
+        memcpy_func = fastarm_memcpy_wrapper;
+        for (int i = 0; i < 5; i++)
+            do_test(test[t].name, test[t].test_func, test[t].bytes);
+        printf("armv5te memcpy:\n");
+        memcpy_func = armv5te_memcpy_wrapper;
+        for (int i = 0; i < 5; i++)
+            do_test(test[t].name, test[t].test_func, test[t].bytes);
+    }
 }
