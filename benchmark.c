@@ -143,40 +143,70 @@ static void test_source_dest_aligned_random_1M(int i) {
         1024 * 1024);
 }
 
+static void test_chunk_aligned_64(int i) {
+    memcpy_func(buffer_chunk + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        buffer_chunk + 64 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        64);
+}
+
+static void test_chunk_aligned_296(int i) {
+    memcpy_func(buffer_chunk + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        buffer_chunk + 64 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        296);
+}
+
 static void test_chunk_aligned_1024(int i) {
-    memcpy_func(buffer_chunk, buffer_chunk + 1024, 1024);
+    memcpy_func(buffer_chunk + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        buffer_chunk + 64 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        1024);
 }
 
 static void test_chunk_aligned_4096(int i) {
-    memcpy_func(buffer_chunk, buffer_chunk + 4096, 4096);
+    memcpy_func(buffer_chunk + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        buffer_chunk + 64 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        4096);
 }
 
 static void test_chunk_aligned_32768(int i) {
-    memcpy_func(buffer_chunk, buffer_chunk + 32768, 32768);
+    memcpy_func(buffer_chunk + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        buffer_chunk + 128 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 32,
+        32768);
 }
 
 static void test_page_aligned_1024(int i) {
-    memcpy_func(buffer_page, buffer_page + 4096, 1024);
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        1024);
 }
 
 static void test_page_aligned_4096(int i) {
-    memcpy_func(buffer_page, buffer_page + 4096, 4096);
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        4096);
 }
 
 static void test_page_aligned_32768(int i) {
-    memcpy_func(buffer_page, buffer_page + 32768, 32768);
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        32768);
 }
 
 static void test_page_aligned_256K(int i) {
-    memcpy_func(buffer_page, buffer_page + 256 * 1024, 256 * 1024);
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        256 * 1024);
 }
 
 static void test_page_aligned_1M(int i) {
-    memcpy_func(buffer_page, buffer_page + 1024 * 1024, 1024 * 1024);
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        1024 * 1024);
 }
 
 static void test_page_aligned_8M(int i) {
-    memcpy_func(buffer_page, buffer_page + 8 * 1024 * 1024, 8 * 1024 * 1024);
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 16384 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        8 * 1024 * 1024);
 }
 
 static void test_random_mixed_sizes_1024(int i) {
@@ -284,7 +314,7 @@ static void do_test_all(const char *name, void (*test_func)(), int bytes) {
     do_test(name, test_func, bytes);
 }
 
-#define NU_TESTS 26
+#define NU_TESTS 28
 
 typedef struct {
     const char *name;
@@ -316,9 +346,11 @@ test_t test[NU_TESTS] = {
        512 },
     { "Up to 64 bytes randomly aligned (DRAM)", test_random_mixed_sizes_DRAM_64,
        32 },
-    { "1024 bytes aligned", test_chunk_aligned_1024, 1024 },
-    { "4096 bytes aligned", test_chunk_aligned_4096, 4096 },
-    { "32768 bytes aligned", test_chunk_aligned_32768, 32768 },
+    { "64 bytes 32-byte aligned", test_chunk_aligned_64, 64 },
+    { "296 bytes 32-byte aligned", test_chunk_aligned_296, 296 },
+    { "1024 bytes 32-byte aligned", test_chunk_aligned_1024, 1024 },
+    { "4096 bytes 32-byte aligned", test_chunk_aligned_4096, 4096 },
+    { "32768 bytes 32-byte aligned", test_chunk_aligned_32768, 32768 },
     { "1024 bytes page aligned", test_page_aligned_1024, 1024 },
     { "4096 bytes page aligned", test_page_aligned_4096, 4096 },
     { "32768 bytes page aligned", test_page_aligned_32768, 32768 },
