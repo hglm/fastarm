@@ -143,6 +143,12 @@ static void test_source_dest_aligned_random_1M(int i) {
         1024 * 1024);
 }
 
+static void test_word_aligned_30(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + 64 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        30);
+}
+
 static void test_word_aligned_64(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
         buffer_page + 64 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
@@ -344,7 +350,7 @@ static void do_test_all(const char *name, void (*test_func)(), int bytes) {
     do_test(name, test_func, bytes);
 }
 
-#define NU_TESTS 33
+#define NU_TESTS 34
 
 typedef struct {
     const char *name;
@@ -376,6 +382,7 @@ test_t test[NU_TESTS] = {
        512 },
     { "Up to 64 bytes randomly aligned (DRAM)", test_random_mixed_sizes_DRAM_64,
        32 },
+    { "30 bytes 4-byte aligned", test_word_aligned_30, 30 },
     { "64 bytes 4-byte aligned", test_word_aligned_64, 64 },
     { "296 bytes 4-byte aligned", test_word_aligned_296, 296 },
     { "1024 bytes 4-byte aligned", test_word_aligned_1024, 1024 },
