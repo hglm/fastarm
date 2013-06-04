@@ -293,7 +293,7 @@ asm_function memcpy_armv5te
     blt     4f
 1:
     pld     [r1, r9]
-    subs    r2, r2, #32
+    sub     r2, r2, #32
     mov     r3, ip, lsr #(\shift * 8)
     ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
     orr     r3, r3, r4, asl #(32 - \shift * 8)
@@ -316,7 +316,7 @@ asm_function memcpy_armv5te
     stmia   r0!, {r7, r8, r10, r11}
     bge     1b
 4:
-    subs    r2, r2, #32
+    sub     r2, r2, #32
     mov     r3, ip, lsr #(\shift * 8)
     ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
     orr     r3, r3, r4, asl #(32 - \shift * 8)
@@ -440,7 +440,7 @@ asm_function memcpy_armv5te_no_overfetch
     stmia   r0!, {r7, r8, r10, r11}
     bge     1b
 10:
-    subs    r2, r2, #32
+    sub     r2, r2, #32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     cmp     r2, #32
     pld     [r1, r9]
