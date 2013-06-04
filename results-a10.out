@@ -1,450 +1,624 @@
 standard memcpy:
-3 bytes randomly aligned: 26.10 MB/s
-3 bytes randomly aligned: 57.55 MB/s
-3 bytes randomly aligned: 62.30 MB/s
-3 bytes randomly aligned: 62.52 MB/s
-3 bytes randomly aligned: 62.51 MB/s
+3 bytes randomly aligned: 54.25 MB/s
+3 bytes randomly aligned: 62.50 MB/s
+3 bytes randomly aligned: 62.50 MB/s
+3 bytes randomly aligned: 60.82 MB/s
+3 bytes randomly aligned: 62.49 MB/s
 fastarm memcpy:
-3 bytes randomly aligned: 39.22 MB/s
-3 bytes randomly aligned: 39.18 MB/s
-3 bytes randomly aligned: 39.22 MB/s
-3 bytes randomly aligned: 39.22 MB/s
-3 bytes randomly aligned: 39.14 MB/s
+3 bytes randomly aligned: 39.19 MB/s
+3 bytes randomly aligned: 39.21 MB/s
+3 bytes randomly aligned: 39.20 MB/s
+3 bytes randomly aligned: 39.20 MB/s
+3 bytes randomly aligned: 39.21 MB/s
 armv5te memcpy:
+3 bytes randomly aligned: 54.20 MB/s
+3 bytes randomly aligned: 54.20 MB/s
+3 bytes randomly aligned: 54.20 MB/s
+3 bytes randomly aligned: 54.19 MB/s
 3 bytes randomly aligned: 54.21 MB/s
-3 bytes randomly aligned: 54.15 MB/s
-3 bytes randomly aligned: 54.21 MB/s
-3 bytes randomly aligned: 52.79 MB/s
-3 bytes randomly aligned: 54.14 MB/s
+armv5te non-overfetching memcpy:
+3 bytes randomly aligned: 54.20 MB/s
+3 bytes randomly aligned: 54.20 MB/s
+3 bytes randomly aligned: 54.18 MB/s
+3 bytes randomly aligned: 54.19 MB/s
+3 bytes randomly aligned: 54.19 MB/s
 standard memcpy:
-8 bytes randomly aligned: 88.14 MB/s
-8 bytes randomly aligned: 87.84 MB/s
-8 bytes randomly aligned: 87.59 MB/s
-8 bytes randomly aligned: 87.56 MB/s
-8 bytes randomly aligned: 87.59 MB/s
+8 bytes randomly aligned: 79.87 MB/s
+8 bytes randomly aligned: 79.21 MB/s
+8 bytes randomly aligned: 79.01 MB/s
+8 bytes randomly aligned: 79.03 MB/s
+8 bytes randomly aligned: 78.91 MB/s
 fastarm memcpy:
-8 bytes randomly aligned: 58.25 MB/s
-8 bytes randomly aligned: 58.38 MB/s
-8 bytes randomly aligned: 58.09 MB/s
-8 bytes randomly aligned: 58.19 MB/s
-8 bytes randomly aligned: 57.97 MB/s
+8 bytes randomly aligned: 80.09 MB/s
+8 bytes randomly aligned: 79.96 MB/s
+8 bytes randomly aligned: 79.93 MB/s
+8 bytes randomly aligned: 79.93 MB/s
+8 bytes randomly aligned: 78.81 MB/s
 armv5te memcpy:
-8 bytes randomly aligned: 116.09 MB/s
+8 bytes randomly aligned: 114.42 MB/s
+8 bytes randomly aligned: 116.03 MB/s
+8 bytes randomly aligned: 116.06 MB/s
+8 bytes randomly aligned: 112.76 MB/s
 8 bytes randomly aligned: 116.05 MB/s
-8 bytes randomly aligned: 116.10 MB/s
-8 bytes randomly aligned: 115.98 MB/s
-8 bytes randomly aligned: 115.96 MB/s
+armv5te non-overfetching memcpy:
+8 bytes randomly aligned: 116.05 MB/s
+8 bytes randomly aligned: 116.06 MB/s
+8 bytes randomly aligned: 116.03 MB/s
+8 bytes randomly aligned: 116.05 MB/s
+8 bytes randomly aligned: 116.04 MB/s
 standard memcpy:
-17 bytes randomly aligned: 160.95 MB/s
-17 bytes randomly aligned: 160.35 MB/s
-17 bytes randomly aligned: 160.11 MB/s
-17 bytes randomly aligned: 160.07 MB/s
-17 bytes randomly aligned: 160.05 MB/s
+17 bytes randomly aligned: 148.93 MB/s
+17 bytes randomly aligned: 146.57 MB/s
+17 bytes randomly aligned: 145.83 MB/s
+17 bytes randomly aligned: 145.78 MB/s
+17 bytes randomly aligned: 145.82 MB/s
 fastarm memcpy:
-17 bytes randomly aligned: 119.17 MB/s
+17 bytes randomly aligned: 119.25 MB/s
 17 bytes randomly aligned: 119.24 MB/s
-17 bytes randomly aligned: 119.22 MB/s
-17 bytes randomly aligned: 119.13 MB/s
+17 bytes randomly aligned: 119.25 MB/s
 17 bytes randomly aligned: 119.24 MB/s
+17 bytes randomly aligned: 119.23 MB/s
 armv5te memcpy:
+17 bytes randomly aligned: 142.82 MB/s
 17 bytes randomly aligned: 142.81 MB/s
-17 bytes randomly aligned: 142.83 MB/s
+17 bytes randomly aligned: 142.79 MB/s
+17 bytes randomly aligned: 142.73 MB/s
+17 bytes randomly aligned: 142.82 MB/s
+armv5te non-overfetching memcpy:
+17 bytes randomly aligned: 142.78 MB/s
+17 bytes randomly aligned: 142.78 MB/s
 17 bytes randomly aligned: 142.80 MB/s
-17 bytes randomly aligned: 142.69 MB/s
-17 bytes randomly aligned: 142.80 MB/s
+17 bytes randomly aligned: 142.76 MB/s
+17 bytes randomly aligned: 142.78 MB/s
 standard memcpy:
-30 bytes randomly aligned: 239.91 MB/s
-30 bytes randomly aligned: 238.17 MB/s
-30 bytes randomly aligned: 237.60 MB/s
-30 bytes randomly aligned: 237.57 MB/s
-30 bytes randomly aligned: 237.53 MB/s
+30 bytes randomly aligned: 220.22 MB/s
+30 bytes randomly aligned: 217.24 MB/s
+30 bytes randomly aligned: 216.97 MB/s
+30 bytes randomly aligned: 216.97 MB/s
+30 bytes randomly aligned: 216.88 MB/s
 fastarm memcpy:
-30 bytes randomly aligned: 169.13 MB/s
-30 bytes randomly aligned: 169.12 MB/s
-30 bytes randomly aligned: 168.97 MB/s
-30 bytes randomly aligned: 169.12 MB/s
-30 bytes randomly aligned: 169.16 MB/s
+30 bytes randomly aligned: 169.25 MB/s
+30 bytes randomly aligned: 169.22 MB/s
+30 bytes randomly aligned: 169.25 MB/s
+30 bytes randomly aligned: 169.24 MB/s
+30 bytes randomly aligned: 169.21 MB/s
 armv5te memcpy:
-30 bytes randomly aligned: 272.33 MB/s
-30 bytes randomly aligned: 272.10 MB/s
-30 bytes randomly aligned: 272.30 MB/s
-30 bytes randomly aligned: 272.22 MB/s
-30 bytes randomly aligned: 272.23 MB/s
+30 bytes randomly aligned: 272.20 MB/s
+30 bytes randomly aligned: 272.18 MB/s
+30 bytes randomly aligned: 272.15 MB/s
+30 bytes randomly aligned: 272.20 MB/s
+30 bytes randomly aligned: 272.21 MB/s
+armv5te non-overfetching memcpy:
+30 bytes randomly aligned: 277.85 MB/s
+30 bytes randomly aligned: 277.78 MB/s
+30 bytes randomly aligned: 277.90 MB/s
+30 bytes randomly aligned: 277.87 MB/s
+30 bytes randomly aligned: 277.92 MB/s
 standard memcpy:
-64 bytes randomly aligned: 435.73 MB/s
-64 bytes randomly aligned: 435.37 MB/s
-64 bytes randomly aligned: 435.76 MB/s
-64 bytes randomly aligned: 435.84 MB/s
-64 bytes randomly aligned: 434.85 MB/s
+64 bytes randomly aligned: 405.33 MB/s
+64 bytes randomly aligned: 405.15 MB/s
+64 bytes randomly aligned: 405.13 MB/s
+64 bytes randomly aligned: 405.16 MB/s
+64 bytes randomly aligned: 405.24 MB/s
 fastarm memcpy:
-64 bytes randomly aligned: 243.77 MB/s
-64 bytes randomly aligned: 244.04 MB/s
-64 bytes randomly aligned: 243.69 MB/s
-64 bytes randomly aligned: 243.95 MB/s
-64 bytes randomly aligned: 243.86 MB/s
+64 bytes randomly aligned: 245.02 MB/s
+64 bytes randomly aligned: 244.98 MB/s
+64 bytes randomly aligned: 245.10 MB/s
+64 bytes randomly aligned: 244.93 MB/s
+64 bytes randomly aligned: 245.05 MB/s
 armv5te memcpy:
-64 bytes randomly aligned: 401.51 MB/s
-64 bytes randomly aligned: 401.49 MB/s
-64 bytes randomly aligned: 401.30 MB/s
-64 bytes randomly aligned: 401.48 MB/s
-64 bytes randomly aligned: 400.96 MB/s
+64 bytes randomly aligned: 401.17 MB/s
+64 bytes randomly aligned: 401.19 MB/s
+64 bytes randomly aligned: 401.20 MB/s
+64 bytes randomly aligned: 401.22 MB/s
+64 bytes randomly aligned: 401.15 MB/s
+armv5te non-overfetching memcpy:
+64 bytes randomly aligned: 457.86 MB/s
+64 bytes randomly aligned: 457.81 MB/s
+64 bytes randomly aligned: 451.49 MB/s
+64 bytes randomly aligned: 457.91 MB/s
+64 bytes randomly aligned: 452.00 MB/s
 standard memcpy:
-137 bytes randomly aligned: 669.93 MB/s
-137 bytes randomly aligned: 669.76 MB/s
-137 bytes randomly aligned: 669.98 MB/s
-137 bytes randomly aligned: 668.89 MB/s
-137 bytes randomly aligned: 669.84 MB/s
+137 bytes randomly aligned: 627.94 MB/s
+137 bytes randomly aligned: 629.62 MB/s
+137 bytes randomly aligned: 634.93 MB/s
+137 bytes randomly aligned: 635.02 MB/s
+137 bytes randomly aligned: 635.16 MB/s
 fastarm memcpy:
-137 bytes randomly aligned: 359.10 MB/s
-137 bytes randomly aligned: 359.12 MB/s
-137 bytes randomly aligned: 359.08 MB/s
-137 bytes randomly aligned: 358.66 MB/s
-137 bytes randomly aligned: 359.24 MB/s
+137 bytes randomly aligned: 358.01 MB/s
+137 bytes randomly aligned: 357.96 MB/s
+137 bytes randomly aligned: 358.02 MB/s
+137 bytes randomly aligned: 358.01 MB/s
+137 bytes randomly aligned: 358.04 MB/s
 armv5te memcpy:
-137 bytes randomly aligned: 608.16 MB/s
-137 bytes randomly aligned: 607.61 MB/s
-137 bytes randomly aligned: 607.47 MB/s
-137 bytes randomly aligned: 608.27 MB/s
-137 bytes randomly aligned: 607.99 MB/s
+137 bytes randomly aligned: 607.80 MB/s
+137 bytes randomly aligned: 607.50 MB/s
+137 bytes randomly aligned: 607.65 MB/s
+137 bytes randomly aligned: 607.75 MB/s
+137 bytes randomly aligned: 607.67 MB/s
+armv5te non-overfetching memcpy:
+137 bytes randomly aligned: 628.54 MB/s
+137 bytes randomly aligned: 628.57 MB/s
+137 bytes randomly aligned: 628.62 MB/s
+137 bytes randomly aligned: 628.56 MB/s
+137 bytes randomly aligned: 628.55 MB/s
 standard memcpy:
-1024 bytes randomly aligned: 1027.39 MB/s
-1024 bytes randomly aligned: 1027.36 MB/s
-1024 bytes randomly aligned: 1027.54 MB/s
-1024 bytes randomly aligned: 1027.48 MB/s
-1024 bytes randomly aligned: 1027.67 MB/s
+1024 bytes randomly aligned: 1018.48 MB/s
+1024 bytes randomly aligned: 1018.41 MB/s
+1024 bytes randomly aligned: 1018.41 MB/s
+1024 bytes randomly aligned: 1017.88 MB/s
+1024 bytes randomly aligned: 1001.27 MB/s
 fastarm memcpy:
-1024 bytes randomly aligned: 859.08 MB/s
-1024 bytes randomly aligned: 858.77 MB/s
-1024 bytes randomly aligned: 859.09 MB/s
-1024 bytes randomly aligned: 858.77 MB/s
-1024 bytes randomly aligned: 858.98 MB/s
+1024 bytes randomly aligned: 836.63 MB/s
+1024 bytes randomly aligned: 837.12 MB/s
+1024 bytes randomly aligned: 826.94 MB/s
+1024 bytes randomly aligned: 790.90 MB/s
+1024 bytes randomly aligned: 837.03 MB/s
 armv5te memcpy:
-1024 bytes randomly aligned: 965.39 MB/s
-1024 bytes randomly aligned: 1025.97 MB/s
-1024 bytes randomly aligned: 1025.90 MB/s
-1024 bytes randomly aligned: 1025.00 MB/s
-1024 bytes randomly aligned: 1025.94 MB/s
+1024 bytes randomly aligned: 1025.67 MB/s
+1024 bytes randomly aligned: 1025.39 MB/s
+1024 bytes randomly aligned: 1025.60 MB/s
+1024 bytes randomly aligned: 1025.70 MB/s
+1024 bytes randomly aligned: 1024.96 MB/s
+armv5te non-overfetching memcpy:
+1024 bytes randomly aligned: 1016.05 MB/s
+1024 bytes randomly aligned: 1016.10 MB/s
+1024 bytes randomly aligned: 1015.83 MB/s
+1024 bytes randomly aligned: 1016.00 MB/s
+1024 bytes randomly aligned: 1016.05 MB/s
 standard memcpy:
-32768 bytes randomly aligned: 886.75 MB/s
-32768 bytes randomly aligned: 886.39 MB/s
-32768 bytes randomly aligned: 885.15 MB/s
-32768 bytes randomly aligned: 886.35 MB/s
-32768 bytes randomly aligned: 886.39 MB/s
+32768 bytes randomly aligned: 850.14 MB/s
+32768 bytes randomly aligned: 850.42 MB/s
+32768 bytes randomly aligned: 850.16 MB/s
+32768 bytes randomly aligned: 850.17 MB/s
+32768 bytes randomly aligned: 850.48 MB/s
 fastarm memcpy:
-32768 bytes randomly aligned: 832.49 MB/s
-32768 bytes randomly aligned: 855.60 MB/s
-32768 bytes randomly aligned: 813.48 MB/s
-32768 bytes randomly aligned: 856.05 MB/s
-32768 bytes randomly aligned: 854.96 MB/s
+32768 bytes randomly aligned: 796.42 MB/s
+32768 bytes randomly aligned: 795.72 MB/s
+32768 bytes randomly aligned: 796.49 MB/s
+32768 bytes randomly aligned: 796.24 MB/s
+32768 bytes randomly aligned: 796.33 MB/s
 armv5te memcpy:
-32768 bytes randomly aligned: 885.96 MB/s
-32768 bytes randomly aligned: 886.74 MB/s
-32768 bytes randomly aligned: 886.97 MB/s
-32768 bytes randomly aligned: 887.26 MB/s
-32768 bytes randomly aligned: 886.86 MB/s
+32768 bytes randomly aligned: 852.06 MB/s
+32768 bytes randomly aligned: 851.64 MB/s
+32768 bytes randomly aligned: 851.78 MB/s
+32768 bytes randomly aligned: 851.69 MB/s
+32768 bytes randomly aligned: 851.86 MB/s
+armv5te non-overfetching memcpy:
+32768 bytes randomly aligned: 847.40 MB/s
+32768 bytes randomly aligned: 847.71 MB/s
+32768 bytes randomly aligned: 847.33 MB/s
+32768 bytes randomly aligned: 847.67 MB/s
+32768 bytes randomly aligned: 847.52 MB/s
 standard memcpy:
-1M bytes randomly aligned: 876.71 MB/s
-1M bytes randomly aligned: 877.38 MB/s
-1M bytes randomly aligned: 877.11 MB/s
-1M bytes randomly aligned: 877.18 MB/s
-1M bytes randomly aligned: 876.91 MB/s
+1M bytes randomly aligned: 868.47 MB/s
+1M bytes randomly aligned: 868.91 MB/s
+1M bytes randomly aligned: 868.60 MB/s
+1M bytes randomly aligned: 868.09 MB/s
+1M bytes randomly aligned: 868.19 MB/s
 fastarm memcpy:
-1M bytes randomly aligned: 814.86 MB/s
-1M bytes randomly aligned: 815.11 MB/s
-1M bytes randomly aligned: 815.92 MB/s
-1M bytes randomly aligned: 816.00 MB/s
-1M bytes randomly aligned: 815.53 MB/s
+1M bytes randomly aligned: 810.78 MB/s
+1M bytes randomly aligned: 810.39 MB/s
+1M bytes randomly aligned: 810.50 MB/s
+1M bytes randomly aligned: 810.10 MB/s
+1M bytes randomly aligned: 810.48 MB/s
 armv5te memcpy:
-1M bytes randomly aligned: 877.66 MB/s
-1M bytes randomly aligned: 877.49 MB/s
-1M bytes randomly aligned: 878.06 MB/s
-1M bytes randomly aligned: 878.19 MB/s
-1M bytes randomly aligned: 877.80 MB/s
+1M bytes randomly aligned: 869.57 MB/s
+1M bytes randomly aligned: 869.76 MB/s
+1M bytes randomly aligned: 869.52 MB/s
+1M bytes randomly aligned: 869.29 MB/s
+1M bytes randomly aligned: 913.17 MB/s
+armv5te non-overfetching memcpy:
+1M bytes randomly aligned: 865.55 MB/s
+1M bytes randomly aligned: 865.60 MB/s
+1M bytes randomly aligned: 865.84 MB/s
+1M bytes randomly aligned: 865.75 MB/s
+1M bytes randomly aligned: 865.94 MB/s
 standard memcpy:
-1024 bytes randomly aligned, source aligned with dest: 1047.14 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1047.97 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1047.59 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1047.93 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1047.07 MB/s
+64 bytes randomly aligned, source aligned with dest: 555.76 MB/s
+64 bytes randomly aligned, source aligned with dest: 555.06 MB/s
+64 bytes randomly aligned, source aligned with dest: 556.10 MB/s
+64 bytes randomly aligned, source aligned with dest: 556.06 MB/s
+64 bytes randomly aligned, source aligned with dest: 555.98 MB/s
 fastarm memcpy:
-1024 bytes randomly aligned, source aligned with dest: 1004.36 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1004.20 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1004.37 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1004.18 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1003.91 MB/s
+64 bytes randomly aligned, source aligned with dest: 316.54 MB/s
+64 bytes randomly aligned, source aligned with dest: 316.38 MB/s
+64 bytes randomly aligned, source aligned with dest: 316.48 MB/s
+64 bytes randomly aligned, source aligned with dest: 312.42 MB/s
+64 bytes randomly aligned, source aligned with dest: 312.18 MB/s
 armv5te memcpy:
-1024 bytes randomly aligned, source aligned with dest: 1054.89 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1054.07 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1054.81 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1054.73 MB/s
-1024 bytes randomly aligned, source aligned with dest: 1054.43 MB/s
+64 bytes randomly aligned, source aligned with dest: 587.45 MB/s
+64 bytes randomly aligned, source aligned with dest: 593.79 MB/s
+64 bytes randomly aligned, source aligned with dest: 593.34 MB/s
+64 bytes randomly aligned, source aligned with dest: 593.74 MB/s
+64 bytes randomly aligned, source aligned with dest: 593.78 MB/s
+armv5te non-overfetching memcpy:
+64 bytes randomly aligned, source aligned with dest: 661.36 MB/s
+64 bytes randomly aligned, source aligned with dest: 661.29 MB/s
+64 bytes randomly aligned, source aligned with dest: 661.42 MB/s
+64 bytes randomly aligned, source aligned with dest: 661.35 MB/s
+64 bytes randomly aligned, source aligned with dest: 661.15 MB/s
 standard memcpy:
-32768 bytes randomly aligned, source aligned with dest: 1065.41 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1053.96 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1048.60 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1048.03 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1047.18 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1047.71 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1047.55 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1047.43 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1047.13 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1047.52 MB/s
 fastarm memcpy:
-32768 bytes randomly aligned, source aligned with dest: 1038.67 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1039.24 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1039.23 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1037.33 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1031.02 MB/s
+1024 bytes randomly aligned, source aligned with dest: 985.30 MB/s
+1024 bytes randomly aligned, source aligned with dest: 985.36 MB/s
+1024 bytes randomly aligned, source aligned with dest: 985.41 MB/s
+1024 bytes randomly aligned, source aligned with dest: 985.41 MB/s
+1024 bytes randomly aligned, source aligned with dest: 985.47 MB/s
 armv5te memcpy:
-32768 bytes randomly aligned, source aligned with dest: 1033.33 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1030.76 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1012.68 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1010.43 MB/s
-32768 bytes randomly aligned, source aligned with dest: 1013.34 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1055.08 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1054.78 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1054.99 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1054.87 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1054.95 MB/s
+armv5te non-overfetching memcpy:
+1024 bytes randomly aligned, source aligned with dest: 1058.57 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1058.99 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1059.02 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1059.10 MB/s
+1024 bytes randomly aligned, source aligned with dest: 1059.03 MB/s
 standard memcpy:
-1M bytes randomly aligned, source aligned with dest: 1004.54 MB/s
-1M bytes randomly aligned, source aligned with dest: 1004.62 MB/s
-1M bytes randomly aligned, source aligned with dest: 1002.73 MB/s
-1M bytes randomly aligned, source aligned with dest: 1004.05 MB/s
-1M bytes randomly aligned, source aligned with dest: 1003.95 MB/s
+32768 bytes randomly aligned, source aligned with dest: 1000.03 MB/s
+32768 bytes randomly aligned, source aligned with dest: 992.60 MB/s
+32768 bytes randomly aligned, source aligned with dest: 986.25 MB/s
+32768 bytes randomly aligned, source aligned with dest: 983.45 MB/s
+32768 bytes randomly aligned, source aligned with dest: 980.99 MB/s
 fastarm memcpy:
-1M bytes randomly aligned, source aligned with dest: 998.15 MB/s
-1M bytes randomly aligned, source aligned with dest: 998.60 MB/s
-1M bytes randomly aligned, source aligned with dest: 935.10 MB/s
-1M bytes randomly aligned, source aligned with dest: 997.98 MB/s
-1M bytes randomly aligned, source aligned with dest: 998.53 MB/s
+32768 bytes randomly aligned, source aligned with dest: 977.76 MB/s
+32768 bytes randomly aligned, source aligned with dest: 976.32 MB/s
+32768 bytes randomly aligned, source aligned with dest: 975.89 MB/s
+32768 bytes randomly aligned, source aligned with dest: 975.71 MB/s
+32768 bytes randomly aligned, source aligned with dest: 975.84 MB/s
 armv5te memcpy:
-1M bytes randomly aligned, source aligned with dest: 1007.01 MB/s
-1M bytes randomly aligned, source aligned with dest: 1006.29 MB/s
-1M bytes randomly aligned, source aligned with dest: 1006.57 MB/s
-1M bytes randomly aligned, source aligned with dest: 1007.00 MB/s
-1M bytes randomly aligned, source aligned with dest: 1006.23 MB/s
+32768 bytes randomly aligned, source aligned with dest: 978.42 MB/s
+32768 bytes randomly aligned, source aligned with dest: 978.58 MB/s
+32768 bytes randomly aligned, source aligned with dest: 978.33 MB/s
+32768 bytes randomly aligned, source aligned with dest: 978.28 MB/s
+32768 bytes randomly aligned, source aligned with dest: 978.34 MB/s
+armv5te non-overfetching memcpy:
+32768 bytes randomly aligned, source aligned with dest: 978.28 MB/s
+32768 bytes randomly aligned, source aligned with dest: 978.46 MB/s
+32768 bytes randomly aligned, source aligned with dest: 977.87 MB/s
+32768 bytes randomly aligned, source aligned with dest: 978.24 MB/s
+32768 bytes randomly aligned, source aligned with dest: 978.21 MB/s
 standard memcpy:
-Up to 1024 bytes randomly aligned: 916.12 MB/s
-Up to 1024 bytes randomly aligned: 917.22 MB/s
-Up to 1024 bytes randomly aligned: 915.92 MB/s
-Up to 1024 bytes randomly aligned: 916.70 MB/s
-Up to 1024 bytes randomly aligned: 917.09 MB/s
+1M bytes randomly aligned, source aligned with dest: 998.39 MB/s
+1M bytes randomly aligned, source aligned with dest: 997.31 MB/s
+1M bytes randomly aligned, source aligned with dest: 997.14 MB/s
+1M bytes randomly aligned, source aligned with dest: 984.21 MB/s
+1M bytes randomly aligned, source aligned with dest: 995.97 MB/s
 fastarm memcpy:
-Up to 1024 bytes randomly aligned: 708.31 MB/s
-Up to 1024 bytes randomly aligned: 710.67 MB/s
-Up to 1024 bytes randomly aligned: 708.50 MB/s
-Up to 1024 bytes randomly aligned: 710.26 MB/s
-Up to 1024 bytes randomly aligned: 709.40 MB/s
+1M bytes randomly aligned, source aligned with dest: 989.52 MB/s
+1M bytes randomly aligned, source aligned with dest: 988.76 MB/s
+1M bytes randomly aligned, source aligned with dest: 989.92 MB/s
+1M bytes randomly aligned, source aligned with dest: 989.65 MB/s
+1M bytes randomly aligned, source aligned with dest: 989.11 MB/s
 armv5te memcpy:
-Up to 1024 bytes randomly aligned: 937.68 MB/s
-Up to 1024 bytes randomly aligned: 938.17 MB/s
-Up to 1024 bytes randomly aligned: 938.21 MB/s
-Up to 1024 bytes randomly aligned: 937.92 MB/s
-Up to 1024 bytes randomly aligned: 937.13 MB/s
+1M bytes randomly aligned, source aligned with dest: 999.63 MB/s
+1M bytes randomly aligned, source aligned with dest: 999.73 MB/s
+1M bytes randomly aligned, source aligned with dest: 999.59 MB/s
+1M bytes randomly aligned, source aligned with dest: 999.57 MB/s
+1M bytes randomly aligned, source aligned with dest: 999.57 MB/s
+armv5te non-overfetching memcpy:
+1M bytes randomly aligned, source aligned with dest: 999.91 MB/s
+1M bytes randomly aligned, source aligned with dest: 999.23 MB/s
+1M bytes randomly aligned, source aligned with dest: 1000.14 MB/s
+1M bytes randomly aligned, source aligned with dest: 999.80 MB/s
+1M bytes randomly aligned, source aligned with dest: 999.50 MB/s
 standard memcpy:
-Up to 64 bytes randomly aligned: 224.31 MB/s
-Up to 64 bytes randomly aligned: 224.25 MB/s
-Up to 64 bytes randomly aligned: 223.98 MB/s
-Up to 64 bytes randomly aligned: 224.04 MB/s
-Up to 64 bytes randomly aligned: 224.42 MB/s
+Up to 1024 bytes randomly aligned: 884.29 MB/s
+Up to 1024 bytes randomly aligned: 884.83 MB/s
+Up to 1024 bytes randomly aligned: 884.72 MB/s
+Up to 1024 bytes randomly aligned: 884.80 MB/s
+Up to 1024 bytes randomly aligned: 884.76 MB/s
 fastarm memcpy:
-Up to 64 bytes randomly aligned: 150.50 MB/s
-Up to 64 bytes randomly aligned: 150.46 MB/s
-Up to 64 bytes randomly aligned: 150.50 MB/s
-Up to 64 bytes randomly aligned: 150.37 MB/s
-Up to 64 bytes randomly aligned: 150.53 MB/s
+Up to 1024 bytes randomly aligned: 698.75 MB/s
+Up to 1024 bytes randomly aligned: 699.02 MB/s
+Up to 1024 bytes randomly aligned: 698.99 MB/s
+Up to 1024 bytes randomly aligned: 698.75 MB/s
+Up to 1024 bytes randomly aligned: 698.96 MB/s
 armv5te memcpy:
-Up to 64 bytes randomly aligned: 230.21 MB/s
-Up to 64 bytes randomly aligned: 230.19 MB/s
-Up to 64 bytes randomly aligned: 229.86 MB/s
-Up to 64 bytes randomly aligned: 230.10 MB/s
-Up to 64 bytes randomly aligned: 230.11 MB/s
+Up to 1024 bytes randomly aligned: 938.10 MB/s
+Up to 1024 bytes randomly aligned: 937.90 MB/s
+Up to 1024 bytes randomly aligned: 937.52 MB/s
+Up to 1024 bytes randomly aligned: 937.96 MB/s
+Up to 1024 bytes randomly aligned: 938.02 MB/s
+armv5te non-overfetching memcpy:
+Up to 1024 bytes randomly aligned: 942.18 MB/s
+Up to 1024 bytes randomly aligned: 942.04 MB/s
+Up to 1024 bytes randomly aligned: 942.06 MB/s
+Up to 1024 bytes randomly aligned: 942.15 MB/s
+Up to 1024 bytes randomly aligned: 942.07 MB/s
 standard memcpy:
-Up to 1024 bytes randomly aligned (DRAM): 668.65 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 668.35 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 668.06 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 669.03 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 667.42 MB/s
+Up to 64 bytes randomly aligned: 208.49 MB/s
+Up to 64 bytes randomly aligned: 208.47 MB/s
+Up to 64 bytes randomly aligned: 204.32 MB/s
+Up to 64 bytes randomly aligned: 208.23 MB/s
+Up to 64 bytes randomly aligned: 208.31 MB/s
 fastarm memcpy:
-Up to 1024 bytes randomly aligned (DRAM): 543.90 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 543.15 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 543.76 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 543.60 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 543.97 MB/s
+Up to 64 bytes randomly aligned: 150.80 MB/s
+Up to 64 bytes randomly aligned: 140.95 MB/s
+Up to 64 bytes randomly aligned: 150.83 MB/s
+Up to 64 bytes randomly aligned: 150.79 MB/s
+Up to 64 bytes randomly aligned: 150.78 MB/s
 armv5te memcpy:
-Up to 1024 bytes randomly aligned (DRAM): 666.47 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 665.95 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 666.42 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 667.14 MB/s
-Up to 1024 bytes randomly aligned (DRAM): 666.36 MB/s
+Up to 64 bytes randomly aligned: 223.37 MB/s
+Up to 64 bytes randomly aligned: 223.40 MB/s
+Up to 64 bytes randomly aligned: 223.41 MB/s
+Up to 64 bytes randomly aligned: 223.42 MB/s
+Up to 64 bytes randomly aligned: 223.40 MB/s
+armv5te non-overfetching memcpy:
+Up to 64 bytes randomly aligned: 250.69 MB/s
+Up to 64 bytes randomly aligned: 250.80 MB/s
+Up to 64 bytes randomly aligned: 250.77 MB/s
+Up to 64 bytes randomly aligned: 250.77 MB/s
+Up to 64 bytes randomly aligned: 250.79 MB/s
 standard memcpy:
-Up to 64 bytes randomly aligned (DRAM): 125.25 MB/s
-Up to 64 bytes randomly aligned (DRAM): 125.25 MB/s
-Up to 64 bytes randomly aligned (DRAM): 125.22 MB/s
-Up to 64 bytes randomly aligned (DRAM): 125.26 MB/s
-Up to 64 bytes randomly aligned (DRAM): 125.22 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 661.38 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 661.40 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 661.36 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 661.23 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 661.35 MB/s
 fastarm memcpy:
-Up to 64 bytes randomly aligned (DRAM): 95.12 MB/s
-Up to 64 bytes randomly aligned (DRAM): 95.16 MB/s
-Up to 64 bytes randomly aligned (DRAM): 95.19 MB/s
-Up to 64 bytes randomly aligned (DRAM): 95.20 MB/s
-Up to 64 bytes randomly aligned (DRAM): 95.12 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 540.05 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 540.00 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 539.79 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 540.09 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 540.00 MB/s
 armv5te memcpy:
-Up to 64 bytes randomly aligned (DRAM): 122.73 MB/s
-Up to 64 bytes randomly aligned (DRAM): 122.71 MB/s
-Up to 64 bytes randomly aligned (DRAM): 122.65 MB/s
-Up to 64 bytes randomly aligned (DRAM): 122.71 MB/s
-Up to 64 bytes randomly aligned (DRAM): 122.74 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 670.22 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 670.13 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 669.99 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 670.15 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 670.25 MB/s
+armv5te non-overfetching memcpy:
+Up to 1024 bytes randomly aligned (DRAM): 664.33 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 663.96 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 664.29 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 659.05 MB/s
+Up to 1024 bytes randomly aligned (DRAM): 656.06 MB/s
 standard memcpy:
-1024 bytes aligned: 1099.59 MB/s
-1024 bytes aligned: 1099.50 MB/s
-1024 bytes aligned: 1099.49 MB/s
-1024 bytes aligned: 1098.61 MB/s
-1024 bytes aligned: 1099.51 MB/s
+Up to 64 bytes randomly aligned (DRAM): 117.66 MB/s
+Up to 64 bytes randomly aligned (DRAM): 119.11 MB/s
+Up to 64 bytes randomly aligned (DRAM): 119.07 MB/s
+Up to 64 bytes randomly aligned (DRAM): 119.16 MB/s
+Up to 64 bytes randomly aligned (DRAM): 119.13 MB/s
 fastarm memcpy:
-1024 bytes aligned: 1094.89 MB/s
-1024 bytes aligned: 1094.20 MB/s
-1024 bytes aligned: 1092.43 MB/s
-1024 bytes aligned: 1094.59 MB/s
-1024 bytes aligned: 1094.48 MB/s
+Up to 64 bytes randomly aligned (DRAM): 94.84 MB/s
+Up to 64 bytes randomly aligned (DRAM): 94.85 MB/s
+Up to 64 bytes randomly aligned (DRAM): 94.84 MB/s
+Up to 64 bytes randomly aligned (DRAM): 94.84 MB/s
+Up to 64 bytes randomly aligned (DRAM): 94.85 MB/s
 armv5te memcpy:
-1024 bytes aligned: 1084.90 MB/s
-1024 bytes aligned: 1084.76 MB/s
-1024 bytes aligned: 1085.45 MB/s
-1024 bytes aligned: 1085.97 MB/s
-1024 bytes aligned: 1085.87 MB/s
+Up to 64 bytes randomly aligned (DRAM): 121.09 MB/s
+Up to 64 bytes randomly aligned (DRAM): 121.07 MB/s
+Up to 64 bytes randomly aligned (DRAM): 121.10 MB/s
+Up to 64 bytes randomly aligned (DRAM): 121.11 MB/s
+Up to 64 bytes randomly aligned (DRAM): 121.14 MB/s
+armv5te non-overfetching memcpy:
+Up to 64 bytes randomly aligned (DRAM): 128.37 MB/s
+Up to 64 bytes randomly aligned (DRAM): 128.35 MB/s
+Up to 64 bytes randomly aligned (DRAM): 128.34 MB/s
+Up to 64 bytes randomly aligned (DRAM): 128.34 MB/s
+Up to 64 bytes randomly aligned (DRAM): 128.39 MB/s
 standard memcpy:
-4096 bytes aligned: 1164.03 MB/s
-4096 bytes aligned: 1129.09 MB/s
-4096 bytes aligned: 1071.22 MB/s
-4096 bytes aligned: 1066.74 MB/s
-4096 bytes aligned: 1062.88 MB/s
+1024 bytes aligned: 1099.16 MB/s
+1024 bytes aligned: 1099.00 MB/s
+1024 bytes aligned: 1098.68 MB/s
+1024 bytes aligned: 1099.14 MB/s
+1024 bytes aligned: 1099.02 MB/s
 fastarm memcpy:
-4096 bytes aligned: 1065.27 MB/s
-4096 bytes aligned: 1062.73 MB/s
-4096 bytes aligned: 1064.78 MB/s
-4096 bytes aligned: 1064.57 MB/s
-4096 bytes aligned: 1065.73 MB/s
+1024 bytes aligned: 1094.19 MB/s
+1024 bytes aligned: 1094.10 MB/s
+1024 bytes aligned: 1093.82 MB/s
+1024 bytes aligned: 1093.93 MB/s
+1024 bytes aligned: 1220.12 MB/s
 armv5te memcpy:
-4096 bytes aligned: 1061.82 MB/s
-4096 bytes aligned: 1063.61 MB/s
-4096 bytes aligned: 1062.99 MB/s
-4096 bytes aligned: 1063.73 MB/s
-4096 bytes aligned: 1064.19 MB/s
+1024 bytes aligned: 1234.06 MB/s
+1024 bytes aligned: 1234.06 MB/s
+1024 bytes aligned: 1234.25 MB/s
+1024 bytes aligned: 1234.20 MB/s
+1024 bytes aligned: 1233.74 MB/s
+armv5te non-overfetching memcpy:
+1024 bytes aligned: 1225.04 MB/s
+1024 bytes aligned: 1225.05 MB/s
+1024 bytes aligned: 1225.23 MB/s
+1024 bytes aligned: 1225.19 MB/s
+1024 bytes aligned: 1225.07 MB/s
 standard memcpy:
-32768 bytes aligned: 1100.53 MB/s
-32768 bytes aligned: 1094.06 MB/s
-32768 bytes aligned: 1088.19 MB/s
-32768 bytes aligned: 1082.19 MB/s
-32768 bytes aligned: 1078.31 MB/s
+4096 bytes aligned: 1440.35 MB/s
+4096 bytes aligned: 1384.57 MB/s
+4096 bytes aligned: 1354.73 MB/s
+4096 bytes aligned: 1354.88 MB/s
+4096 bytes aligned: 1354.99 MB/s
 fastarm memcpy:
-32768 bytes aligned: 1070.00 MB/s
-32768 bytes aligned: 1069.00 MB/s
-32768 bytes aligned: 1066.89 MB/s
-32768 bytes aligned: 1064.49 MB/s
-32768 bytes aligned: 1060.02 MB/s
+4096 bytes aligned: 1336.42 MB/s
+4096 bytes aligned: 1292.79 MB/s
+4096 bytes aligned: 1292.62 MB/s
+4096 bytes aligned: 1292.76 MB/s
+4096 bytes aligned: 1292.79 MB/s
 armv5te memcpy:
-32768 bytes aligned: 1054.42 MB/s
-32768 bytes aligned: 1052.51 MB/s
-32768 bytes aligned: 1051.83 MB/s
-32768 bytes aligned: 1049.54 MB/s
-32768 bytes aligned: 1052.09 MB/s
+4096 bytes aligned: 1282.68 MB/s
+4096 bytes aligned: 1282.87 MB/s
+4096 bytes aligned: 1282.81 MB/s
+4096 bytes aligned: 1282.57 MB/s
+4096 bytes aligned: 1282.70 MB/s
+armv5te non-overfetching memcpy:
+4096 bytes aligned: 1280.82 MB/s
+4096 bytes aligned: 1280.51 MB/s
+4096 bytes aligned: 1246.07 MB/s
+4096 bytes aligned: 1280.56 MB/s
+4096 bytes aligned: 1280.47 MB/s
 standard memcpy:
-1024 bytes page aligned: 1076.80 MB/s
-1024 bytes page aligned: 1075.64 MB/s
-1024 bytes page aligned: 1075.07 MB/s
-1024 bytes page aligned: 1076.75 MB/s
-1024 bytes page aligned: 1076.58 MB/s
+32768 bytes aligned: 1285.35 MB/s
+32768 bytes aligned: 1234.61 MB/s
+32768 bytes aligned: 1267.60 MB/s
+32768 bytes aligned: 1267.51 MB/s
+32768 bytes aligned: 1267.49 MB/s
 fastarm memcpy:
-1024 bytes page aligned: 1073.29 MB/s
-1024 bytes page aligned: 1071.83 MB/s
-1024 bytes page aligned: 1073.26 MB/s
-1024 bytes page aligned: 1073.46 MB/s
-1024 bytes page aligned: 1073.01 MB/s
+32768 bytes aligned: 1266.60 MB/s
+32768 bytes aligned: 1266.68 MB/s
+32768 bytes aligned: 1266.71 MB/s
+32768 bytes aligned: 1265.80 MB/s
+32768 bytes aligned: 1265.45 MB/s
 armv5te memcpy:
-1024 bytes page aligned: 1058.94 MB/s
-1024 bytes page aligned: 1061.47 MB/s
-1024 bytes page aligned: 1061.50 MB/s
-1024 bytes page aligned: 1060.79 MB/s
-1024 bytes page aligned: 1060.40 MB/s
+32768 bytes aligned: 1264.60 MB/s
+32768 bytes aligned: 1264.47 MB/s
+32768 bytes aligned: 1264.68 MB/s
+32768 bytes aligned: 1264.52 MB/s
+32768 bytes aligned: 1264.57 MB/s
+armv5te non-overfetching memcpy:
+32768 bytes aligned: 1264.31 MB/s
+32768 bytes aligned: 1264.26 MB/s
+32768 bytes aligned: 1263.98 MB/s
+32768 bytes aligned: 1264.15 MB/s
+32768 bytes aligned: 1263.99 MB/s
 standard memcpy:
-4096 bytes page aligned: 1080.46 MB/s
-4096 bytes page aligned: 1080.40 MB/s
-4096 bytes page aligned: 1080.39 MB/s
-4096 bytes page aligned: 1079.43 MB/s
-4096 bytes page aligned: 1080.50 MB/s
+1024 bytes page aligned: 1273.94 MB/s
+1024 bytes page aligned: 1273.88 MB/s
+1024 bytes page aligned: 1273.54 MB/s
+1024 bytes page aligned: 1274.40 MB/s
+1024 bytes page aligned: 1274.34 MB/s
 fastarm memcpy:
-4096 bytes page aligned: 1078.63 MB/s
-4096 bytes page aligned: 1077.21 MB/s
-4096 bytes page aligned: 1078.17 MB/s
-4096 bytes page aligned: 1077.96 MB/s
-4096 bytes page aligned: 1079.95 MB/s
+1024 bytes page aligned: 1263.67 MB/s
+1024 bytes page aligned: 1263.78 MB/s
+1024 bytes page aligned: 1263.79 MB/s
+1024 bytes page aligned: 1263.63 MB/s
+1024 bytes page aligned: 1263.80 MB/s
 armv5te memcpy:
-4096 bytes page aligned: 1076.50 MB/s
-4096 bytes page aligned: 1075.68 MB/s
-4096 bytes page aligned: 1077.09 MB/s
-4096 bytes page aligned: 1008.37 MB/s
-4096 bytes page aligned: 1077.03 MB/s
+1024 bytes page aligned: 1233.37 MB/s
+1024 bytes page aligned: 1232.91 MB/s
+1024 bytes page aligned: 1217.54 MB/s
+1024 bytes page aligned: 1233.54 MB/s
+1024 bytes page aligned: 1218.67 MB/s
+armv5te non-overfetching memcpy:
+1024 bytes page aligned: 1194.39 MB/s
+1024 bytes page aligned: 1226.66 MB/s
+1024 bytes page aligned: 1226.86 MB/s
+1024 bytes page aligned: 1227.07 MB/s
+1024 bytes page aligned: 1226.84 MB/s
 standard memcpy:
-32768 bytes page aligned: 1083.99 MB/s
-32768 bytes page aligned: 1058.40 MB/s
-32768 bytes page aligned: 1053.31 MB/s
-32768 bytes page aligned: 1049.52 MB/s
-32768 bytes page aligned: 1047.83 MB/s
+4096 bytes page aligned: 1285.50 MB/s
+4096 bytes page aligned: 1288.01 MB/s
+4096 bytes page aligned: 1287.71 MB/s
+4096 bytes page aligned: 1287.71 MB/s
+4096 bytes page aligned: 1287.86 MB/s
 fastarm memcpy:
-32768 bytes page aligned: 1043.64 MB/s
-32768 bytes page aligned: 1041.99 MB/s
-32768 bytes page aligned: 1041.67 MB/s
-32768 bytes page aligned: 1040.39 MB/s
-32768 bytes page aligned: 1041.47 MB/s
+4096 bytes page aligned: 1290.69 MB/s
+4096 bytes page aligned: 1266.33 MB/s
+4096 bytes page aligned: 1290.17 MB/s
+4096 bytes page aligned: 1290.65 MB/s
+4096 bytes page aligned: 1290.79 MB/s
 armv5te memcpy:
-32768 bytes page aligned: 1040.42 MB/s
-32768 bytes page aligned: 1039.49 MB/s
-32768 bytes page aligned: 1038.67 MB/s
-32768 bytes page aligned: 1039.45 MB/s
-32768 bytes page aligned: 919.31 MB/s
+4096 bytes page aligned: 1202.75 MB/s
+4096 bytes page aligned: 1281.37 MB/s
+4096 bytes page aligned: 1281.49 MB/s
+4096 bytes page aligned: 1281.50 MB/s
+4096 bytes page aligned: 1280.64 MB/s
+armv5te non-overfetching memcpy:
+4096 bytes page aligned: 1280.43 MB/s
+4096 bytes page aligned: 1280.62 MB/s
+4096 bytes page aligned: 1280.51 MB/s
+4096 bytes page aligned: 1280.58 MB/s
+4096 bytes page aligned: 1280.53 MB/s
 standard memcpy:
-256K bytes page aligned: 638.86 MB/s
-256K bytes page aligned: 638.65 MB/s
-256K bytes page aligned: 638.21 MB/s
-256K bytes page aligned: 638.55 MB/s
-256K bytes page aligned: 638.39 MB/s
+32768 bytes page aligned: 1283.61 MB/s
+32768 bytes page aligned: 1278.26 MB/s
+32768 bytes page aligned: 1273.53 MB/s
+32768 bytes page aligned: 1273.17 MB/s
+32768 bytes page aligned: 1272.03 MB/s
 fastarm memcpy:
-256K bytes page aligned: 617.58 MB/s
-256K bytes page aligned: 616.77 MB/s
-256K bytes page aligned: 616.81 MB/s
-256K bytes page aligned: 616.45 MB/s
-256K bytes page aligned: 617.20 MB/s
+32768 bytes page aligned: 1268.71 MB/s
+32768 bytes page aligned: 1266.56 MB/s
+32768 bytes page aligned: 1265.01 MB/s
+32768 bytes page aligned: 1265.25 MB/s
+32768 bytes page aligned: 1265.57 MB/s
 armv5te memcpy:
-256K bytes page aligned: 613.84 MB/s
-256K bytes page aligned: 613.73 MB/s
-256K bytes page aligned: 613.25 MB/s
-256K bytes page aligned: 613.67 MB/s
-256K bytes page aligned: 613.63 MB/s
+32768 bytes page aligned: 1264.63 MB/s
+32768 bytes page aligned: 1264.56 MB/s
+32768 bytes page aligned: 1264.50 MB/s
+32768 bytes page aligned: 1264.42 MB/s
+32768 bytes page aligned: 1264.69 MB/s
+armv5te non-overfetching memcpy:
+32768 bytes page aligned: 1264.62 MB/s
+32768 bytes page aligned: 1264.26 MB/s
+32768 bytes page aligned: 1263.79 MB/s
+32768 bytes page aligned: 1264.35 MB/s
+32768 bytes page aligned: 1264.50 MB/s
 standard memcpy:
-1M bytes page aligned: 1006.75 MB/s
-1M bytes page aligned: 1004.98 MB/s
-1M bytes page aligned: 1005.44 MB/s
-1M bytes page aligned: 1006.31 MB/s
-1M bytes page aligned: 1005.95 MB/s
+256K bytes page aligned: 964.36 MB/s
+256K bytes page aligned: 964.53 MB/s
+256K bytes page aligned: 964.04 MB/s
+256K bytes page aligned: 964.36 MB/s
+256K bytes page aligned: 964.63 MB/s
 fastarm memcpy:
-1M bytes page aligned: 992.15 MB/s
-1M bytes page aligned: 992.77 MB/s
-1M bytes page aligned: 933.04 MB/s
-1M bytes page aligned: 991.13 MB/s
-1M bytes page aligned: 991.88 MB/s
+256K bytes page aligned: 910.20 MB/s
+256K bytes page aligned: 910.68 MB/s
+256K bytes page aligned: 910.71 MB/s
+256K bytes page aligned: 910.88 MB/s
+256K bytes page aligned: 910.81 MB/s
 armv5te memcpy:
-1M bytes page aligned: 1003.21 MB/s
-1M bytes page aligned: 1004.06 MB/s
-1M bytes page aligned: 1002.73 MB/s
-1M bytes page aligned: 1001.56 MB/s
-1M bytes page aligned: 1002.61 MB/s
+256K bytes page aligned: 897.81 MB/s
+256K bytes page aligned: 897.98 MB/s
+256K bytes page aligned: 898.23 MB/s
+256K bytes page aligned: 898.03 MB/s
+256K bytes page aligned: 898.40 MB/s
+armv5te non-overfetching memcpy:
+256K bytes page aligned: 898.40 MB/s
+256K bytes page aligned: 897.85 MB/s
+256K bytes page aligned: 897.45 MB/s
+256K bytes page aligned: 898.34 MB/s
+256K bytes page aligned: 898.15 MB/s
 standard memcpy:
-8M bytes page aligned: 996.49 MB/s
-8M bytes page aligned: 995.28 MB/s
-8M bytes page aligned: 937.28 MB/s
-8M bytes page aligned: 992.43 MB/s
-8M bytes page aligned: 992.95 MB/s
+1M bytes page aligned: 1230.63 MB/s
+1M bytes page aligned: 1228.88 MB/s
+1M bytes page aligned: 1228.51 MB/s
+1M bytes page aligned: 1228.76 MB/s
+1M bytes page aligned: 1228.75 MB/s
 fastarm memcpy:
-8M bytes page aligned: 980.95 MB/s
-8M bytes page aligned: 860.67 MB/s
-8M bytes page aligned: 979.46 MB/s
-8M bytes page aligned: 980.22 MB/s
-8M bytes page aligned: 980.97 MB/s
+1M bytes page aligned: 1181.13 MB/s
+1M bytes page aligned: 1181.05 MB/s
+1M bytes page aligned: 1180.75 MB/s
+1M bytes page aligned: 1181.01 MB/s
+1M bytes page aligned: 1180.78 MB/s
 armv5te memcpy:
-8M bytes page aligned: 993.62 MB/s
-8M bytes page aligned: 992.20 MB/s
-8M bytes page aligned: 993.23 MB/s
-8M bytes page aligned: 993.84 MB/s
-8M bytes page aligned: 993.43 MB/s
+1M bytes page aligned: 1221.22 MB/s
+1M bytes page aligned: 1221.39 MB/s
+1M bytes page aligned: 1221.43 MB/s
+1M bytes page aligned: 1221.12 MB/s
+1M bytes page aligned: 1221.42 MB/s
+armv5te non-overfetching memcpy:
+1M bytes page aligned: 1221.28 MB/s
+1M bytes page aligned: 1221.01 MB/s
+1M bytes page aligned: 1221.45 MB/s
+1M bytes page aligned: 1221.31 MB/s
+1M bytes page aligned: 1221.07 MB/s
+standard memcpy:
+8M bytes page aligned: 1240.97 MB/s
+8M bytes page aligned: 1240.72 MB/s
+8M bytes page aligned: 1240.41 MB/s
+8M bytes page aligned: 1239.85 MB/s
+8M bytes page aligned: 1240.15 MB/s
+fastarm memcpy:
+8M bytes page aligned: 1190.99 MB/s
+8M bytes page aligned: 1191.32 MB/s
+8M bytes page aligned: 1191.14 MB/s
+8M bytes page aligned: 1191.17 MB/s
+8M bytes page aligned: 1191.33 MB/s
+armv5te memcpy:
+8M bytes page aligned: 1236.80 MB/s
+8M bytes page aligned: 1236.52 MB/s
+8M bytes page aligned: 1237.05 MB/s
+8M bytes page aligned: 1222.11 MB/s
+8M bytes page aligned: 1206.69 MB/s
+armv5te non-overfetching memcpy:
+8M bytes page aligned: 1236.60 MB/s
+8M bytes page aligned: 1236.77 MB/s
+8M bytes page aligned: 1237.03 MB/s
+8M bytes page aligned: 1237.10 MB/s
+8M bytes page aligned: 1237.01 MB/s

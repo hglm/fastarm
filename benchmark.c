@@ -40,6 +40,7 @@ typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
 memcpy_func_type memcpy_func;
 memcpy_func_type standard_memcpy_func, fastarm_memcpy_func, armv5te_memcpy_func;
+memcpy_func_type armv5te_no_overfetch_memcpy_func;
 uint8_t *buffer_chunk, *buffer_page;
 int *random_buffer_1024;
 double test_duration = DEFAULT_TEST_DURATION;
@@ -50,6 +51,10 @@ static void *fastarm_memcpy_wrapper(void *dest, const void *src, size_t n) {
 
 static void *armv5te_memcpy_wrapper(void *dest, const void *src, size_t n) {
     return memcpy_armv5te(dest, src, n);
+}
+
+static void *armv5te_no_overfetch_memcpy_wrapper(void *dest, const void *src, size_t n) {
+    return memcpy_armv5te_no_overfetch(dest, src, n);
 }
 
 static double get_time() {
@@ -111,6 +116,12 @@ static void test_unaligned_random_1M(int i) {
         buffer_page + 2 * 1024 * 1024 +
         random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
         1024 * 1024);
+}
+
+static void test_source_dest_aligned_random_64(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[i & (RANDOM_BUFFER_SIZE - 1)],
+        buffer_page + 4096 + random_buffer_1024[i & (RANDOM_BUFFER_SIZE - 1)],
+        64);
 }
 
 static void test_source_dest_aligned_random_1024(int i) {
@@ -268,9 +279,12 @@ static void do_test_all(const char *name, void (*test_func)(), int bytes) {
     memcpy_func = armv5te_memcpy_func;
     printf("armv5te memcpy: ");
     do_test(name, test_func, bytes);
+    memcpy_func = armv5te_no_overfetch_memcpy_func;
+    printf("armv5te non-overfetching memcpy: ");
+    do_test(name, test_func, bytes);
 }
 
-#define NU_TESTS 25
+#define NU_TESTS 26
 
 typedef struct {
     const char *name;
@@ -288,6 +302,8 @@ test_t test[NU_TESTS] = {
     { "1024 bytes randomly aligned", test_unaligned_random_1024, 1024 },
     { "32768 bytes randomly aligned", test_unaligned_random_32768, 32768 },
     { "1M bytes randomly aligned", test_unaligned_random_1M, 1024 * 1024 },
+    { "64 bytes randomly aligned, source aligned with dest",
+        test_source_dest_aligned_random_64, 64 },
     { "1024 bytes randomly aligned, source aligned with dest",
         test_source_dest_aligned_random_1024, 1024 },
     { "32768 bytes randomly aligned, source aligned with dest",
@@ -396,11 +412,13 @@ int main(int argc, char *argv[]) {
     if (sizeof(size_t) == sizeof(int)) {
         fastarm_memcpy_func = fastarm_memcpy;
         armv5te_memcpy_func = memcpy_armv5te;
+        armv5te_no_overfetch_memcpy_func = memcpy_armv5te_no_overfetch;
     }
     else {
         printf("Using wrappers for fastarm_memcpy and armv5te_memcpy.\n");
         fastarm_memcpy_func = fastarm_memcpy_wrapper;
         armv5te_memcpy_func = armv5te_memcpy_wrapper;
+        armv5te_no_overfetch_memcpy_func = armv5te_no_overfetch_memcpy_wrapper;
     }
 
     if (command_quick) {
@@ -429,5 +447,9 @@ int main(int argc, char *argv[]) {
         memcpy_func = armv5te_memcpy_func;
         for (int i = 0; i < 5; i++)
             do_test(test[t].name, test[t].test_func, test[t].bytes);
-    }
+        printf("armv5te non-overfetching memcpy:\n");
+        memcpy_func = armv5te_no_overfetch_memcpy_func;
+        for (int i = 0; i < 5; i++)
+            do_test(test[t].name, test[t].test_func, test[t].bytes);
+   }
 }
