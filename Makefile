@@ -1,5 +1,8 @@
-CFLAGS = -std=gnu99 -Ofast -Wall
-PCFLAGS = -std=gnu99 -O -Wall -pg -ggdb
+# Defining ARM_ALIGN=32 enables 32-byte aligned writes in memcpy_armv5te_no_overfetch
+# for the word aligned case. Default is 16-byte aligned writes.
+CONFIG_FLAGS = -DARM_ALIGN=16
+CFLAGS = -std=gnu99 -Ofast -Wall $(CONFIG_FLAGS)
+PCFLAGS = -std=gnu99 -O -Wall $(CONFIG_FLAGS) -pg -ggdb
 
 all : libfastarm.a benchmark
 

@@ -390,7 +390,11 @@ asm_function memcpy_armv5te
  */
 
 asm_function memcpy_armv5te_no_overfetch
+#if ARM_ALIGN == 32
+    cmp     r2, #36
+#else
     cmp     r2, #20
+#endif
     blt     9f
     /* copy data until destination address is 4 bytes aligned */
     stmfd   sp!, {r0, r4}
@@ -420,9 +424,15 @@ asm_function memcpy_armv5te_no_overfetch
     strne   r4, [r0], #4
     tst     r0, #8
     ldmiane r1!, {r3-r4}
-    add     r9, r1, #96
     subne   r2, r2, #8
     stmiane r0!, {r3-r4}
+#if ARM_ALIGN == 32
+    tst     r0, #16
+    ldmiane r11, {r3-r6}
+    subne   r2, r2, #16
+    stmiane r0!, {r3-r6}
+#endif
+    add     r9, r1, #96
     cmp     r2, #32
     bic     r9, r9, #31
     /* If there are less than 32 bytes to go, skip all loops. */
