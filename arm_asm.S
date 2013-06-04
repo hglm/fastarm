@@ -27,6 +27,10 @@
  *    removing conditional statements from aligned case inner loop by adding a free
  *    compare instruction (saves one loop traversal). Do a similar thing for the
  *    non-aligned inner loop.
+ * 3. Add ARM_ALIGN compile time define and apply it to the non-overfetching
+ *    version.
+ * 4. Add word copier for small sizes when source and destination are both word
+ *    aligned. (Only applied to the non-overfetching version).
  */
 
 /* Prevent the stack from becoming executable */
@@ -489,8 +493,18 @@ asm_function memcpy_armv5te_no_overfetch
 8:
     UNALIGNED_MEMCPY_NO_OVERFETCH 3
 9:
+    /*
+     * Size < 36.
+     * Test whether both source and destination
+     * are word-aligned, otherwise use a byte-copier.
+     */
+    tst    r0, #3
+    andseq r3, r1, #3
     stmfd  sp!, {r0, r4}
-1:  subs   r2, r2, #3
+    beq    2f
+    /* Byte copier. */
+1:
+    subs   r2, r2, #3
     ldrbge ip, [r0]
     ldrbge r3, [r1], #1
     ldrbge r4, [r1], #1
@@ -508,6 +522,21 @@ asm_function memcpy_armv5te_no_overfetch
     ldr    r4, [sp], #4
     strbgt r3, [ip], #1
     bx     lr
+2:
+    /* Copy words. */
+    subs   r2, r2, #4
+    ldrge  r3, [r1], #4
+    strge  r3, [r0], #4
+    bge 2b
+    tst     r2, #2
+    mov     ip, r0
+    ldrhne  r3, [r1], #2
+    strhne  r3, [ip], #2
+    tst     r2, #1
+    ldrbne  r3, [r1], #1
+    ldmfd   sp!, {r0, r4}
+    strbne  r3, [ip], #1
+    bx      lr
 .endfunc
 
 #endif
