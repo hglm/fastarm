@@ -283,13 +283,13 @@ asm_function memcpy_armv5te
     stmiane r0!, {r3-r4}
     cmp     r2, #32
     blt     3f
+    cmp     r2, #128
     pld     [r1, #48]
     stmfd   sp!, {r7, r8, r9, r10, r11}
     add     r3, r1, #128
     bic     r3, r3, #31
-    /* If there are less than 128 bytes to go, skip the main loop. */
-    cmp     r2, 128
     sub     r9, r3, r1
+    /* If there are less than 128 bytes to go, skip the main loop. */
     blt     4f
 1:
     pld     [r1, r9]
@@ -298,6 +298,7 @@ asm_function memcpy_armv5te
     ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
     orr     r3, r3, r4, asl #(32 - \shift * 8)
     mov     r4, r4, lsr #(\shift * 8)
+    cmp     r2, #32
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
     orr     r5, r5, r6, asl #(32 - \shift * 8)
@@ -311,7 +312,6 @@ asm_function memcpy_armv5te
     mov     r10, r10, lsr #(\shift * 8)
     orr     r10, r10, r11, asl #(32 - \shift * 8)
     mov     r11, r11, lsr #(\shift * 8)
-    cmp     r2, #32
     orr     r11, r11, ip, asl #(32 - \shift * 8)
     stmia   r0!, {r7, r8, r10, r11}
     bge     1b
@@ -321,6 +321,7 @@ asm_function memcpy_armv5te
     ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
     orr     r3, r3, r4, asl #(32 - \shift * 8)
     mov     r4, r4, lsr #(\shift * 8)
+    cmp     r2, #32
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
     orr     r5, r5, r6, asl #(32 - \shift * 8)
@@ -334,7 +335,6 @@ asm_function memcpy_armv5te
     mov     r10, r10, lsr #(\shift * 8)
     orr     r10, r10, r11, asl #(32 - \shift * 8)
     mov     r11, r11, lsr #(\shift * 8)
-    cmp     r2, #32
     orr     r11, r11, ip, asl #(32 - \shift * 8)
     stmia   r0!, {r7, r8, r10, r11}
     bge     4b
@@ -434,17 +434,17 @@ asm_function memcpy_armv5te_no_overfetch
 1:
     sub     r2, r2, #32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    cmp     r2, #96
     pld     [r1, r9]
     stmia   r0!, {r3-r6}
-    cmp     r2, #96
     stmia   r0!, {r7, r8, r10, r11}
     bge     1b
 10:
     subs    r2, r2, #32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    cmp     r2, #32
     pld     [r1, r9]
     stmia   r0!, {r3-r6}
-    cmp     r2, #32
     stmia   r0!, {r7, r8, r10, r11}
     bge     10b
 2:
