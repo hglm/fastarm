@@ -31,8 +31,9 @@
  *    version.
  * 4. Add word copier for small sizes when source and destination are both word
  *    aligned. (Only applied to the non-overfetching version).
- * 5. Add half-word copier for small sizes when thre source and destination are both
+ * 5. Add half-word copier for small sizes when the source and destination are both
  *    half-word aligned (non-overfetching version).
+ * To do: Apply ARM_ALIGN=32 to the unaligned macro cases.
  */
 
 /* Prevent the stack from becoming executable */
@@ -547,8 +548,9 @@ asm_function memcpy_armv5te_no_overfetch
     subs   r2, r2, #2
     ldrhge r3, [r1], #2
     strhge r3, [r0], #2
-    bge 3b
+    bge    3b
     tst    r2, #1
+    mov    ip, r0
     ldrbne r3, [r1], #1
     ldmfd  sp!, {r0, r4}
     strbne r3, [ip], #1
