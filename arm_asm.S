@@ -298,7 +298,7 @@ asm_function memcpy_armv5te
     ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
     orr     r3, r3, r4, asl #(32 - \shift * 8)
     mov     r4, r4, lsr #(\shift * 8)
-    cmp     r2, #32
+    cmp     r2, #128
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
     orr     r5, r5, r6, asl #(32 - \shift * 8)
@@ -393,15 +393,15 @@ asm_function memcpy_armv5te_no_overfetch
     cmp     r2, #20
     blt     9f
     /* copy data until destination address is 4 bytes aligned */
+    stmfd   sp!, {r0, r4}
     tst     r0, #1
     ldrbne  r3, [r1], #1
-    stmfd   sp!, {r0, r4}
     subne   r2, r2, #1
     strbne  r3, [r0], #1
+    stmfd   sp!, {r5, r6}
     tst     r0, #2
     ldrbne  r3, [r1], #1
     ldrbne  r4, [r1], #1
-    stmfd   sp!, {r5, r6}
     subne   r2, r2, #2
     orrne   r3, r3, r4, asl #8
     strhne  r3, [r0], #2
