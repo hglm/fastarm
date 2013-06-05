@@ -372,6 +372,9 @@ asm_function memcpy_armv5te
     orr     r10, r10, r11, asl #(32 - \shift * 8)
     mov     r11, r11, lsr #(\shift * 8)
     orr     r11, r11, ip, asl #(32 - \shift * 8)
+.if \block_write_size == 32
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+.endif
 .if \block_write_size == 16
     stmia   r0!, {r7, r8, r10, r11}
 .endif
@@ -429,7 +432,7 @@ asm_function memcpy_armv5te
 /*
  * Macro that defines the main body of a memcpy version with no over-fetching
  * beyond the source memory region. write_align must be 32 or 16,
- * block_write_size must be 16 or 8.
+ * block_write_size must be 32, 16 or 8.
  */
 
 .macro MEMCPY_NO_OVERFETCH write_align, block_write_size
@@ -486,6 +489,12 @@ asm_function memcpy_armv5te
     blt     10f
 1:
     sub     r2, r2, #32
+.if \block_write_size == 32
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    cmp     r2, #96
+    pld     [r1, r9]
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+.endif
 .if \block_write_size == 16
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     cmp     r2, #96
@@ -494,11 +503,10 @@ asm_function memcpy_armv5te
     stmia   r0!, {r7, r8, r10, r11}
 .endif
 .if \block_write_size == 8
-    ldmia   r1!, {r3-r6}
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     cmp     r2, #96
     stmia   r0!, {r3-r4}
     stmia   r0!, {r5-r6}
-    ldmia   r1!, {r7, r8, r10, r11}
     pld     [r1, r9]
     stmia   r0!, {r7-r8}
     stmia   r0!, {r10-r11}
@@ -506,6 +514,12 @@ asm_function memcpy_armv5te
     bge     1b
 10:
     sub     r2, r2, #32
+.if \block_write_size == 32
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    cmp     r2, #32
+    pld     [r1, r9]
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+.endif
 .if \block_write_size == 16
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     cmp     r2, #32
@@ -514,11 +528,10 @@ asm_function memcpy_armv5te
     stmia   r0!, {r7, r8, r10, r11}
 .endif
 .if \block_write_size == 8
-    ldmia   r1!, {r3-r6}
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     cmp     r2, #32
     stmia   r0!, {r3-r4}
     stmia   r0!, {r5-r6}
-    ldmia   r1!, {r7, r8, r10, r11}
     stmia   r0!, {r7-r8}
     stmia   r0!, {r10-r11}
 .endif
@@ -616,20 +629,24 @@ asm_function memcpy_armv5te
     bx     lr
 .endm
 
-asm_function memcpy_armv5te_no_overfetch_align_16
-    MEMCPY_NO_OVERFETCH 16, 16
-.endfunc
-
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8
     MEMCPY_NO_OVERFETCH 16, 8
 .endfunc
 
-asm_function memcpy_armv5te_no_overfetch_align_32
-    MEMCPY_NO_OVERFETCH 32, 16
+asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16
+    MEMCPY_NO_OVERFETCH 16, 16
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_8
     MEMCPY_NO_OVERFETCH 32, 8
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16
+    MEMCPY_NO_OVERFETCH 32, 16
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32
+    MEMCPY_NO_OVERFETCH 32, 32
 .endfunc
 
 #endif

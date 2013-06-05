@@ -35,7 +35,7 @@
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
-#define NU_MEMCPY_VARIANTS 7
+#define NU_MEMCPY_VARIANTS 8
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
@@ -54,20 +54,22 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "standard memcpy",
     "libfastarm memcpy",
     "armv5te memcpy",
-    "armv5te non-overfetching memcpy with write alignment of 16",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 8",
-    "armv5te non-overfetching memcpy with write alignment of 32",
-    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 8"
+    "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 16",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 8",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32"
 };
 
 static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy,
     fastarm_memcpy,
     memcpy_armv5te,
-    memcpy_armv5te_no_overfetch_align_16,
     memcpy_armv5te_no_overfetch_align_16_block_write_8,
-    memcpy_armv5te_no_overfetch_align_32,
-    memcpy_armv5te_no_overfetch_align_32_block_write_8
+    memcpy_armv5te_no_overfetch_align_16_block_write_16,
+    memcpy_armv5te_no_overfetch_align_32_block_write_8,
+    memcpy_armv5te_no_overfetch_align_32_block_write_16,
+    memcpy_armv5te_no_overfetch_align_32_block_write_32
 };
 
 static double get_time() {
@@ -419,7 +421,7 @@ static void usage() {
                 "--duration <n>  Sets the duration of each individual test. Default is 2 seconds.\n"
                 "--memcpy <list> Instead of testing all memcpy variants, test only the memcpy variants\n"
                 "                in <list>. <list> is a string of digits from 0 to 4, corresponding\n"
-                "                to each memcpy variant (for example, 01234 select all variants).\n"
+                "                to each memcpy variant (for example, 0123456 select all variants).\n"
                 );
 }
 
