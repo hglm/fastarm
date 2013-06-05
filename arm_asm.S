@@ -23,19 +23,9 @@
  * Modified by Harm Hanemaaijer <fgenfb@yahoo.com>:
  * 1. Add ".type <function_name>, function" to function definition macro, which
  *    was required for correct linkage on my platform.
- * 2. Add non-overfetching memcpy version. Optimize this version a little by
- *    removing conditional statements from aligned case inner loop by adding a free
- *    compare instruction (saves one loop traversal). Do a similar thing for the
- *    non-aligned inner loop.
- * 3. Add ARM_ALIGN compile time define and apply it to the non-overfetching
- *    version.
- * 4. Add word copier for small sizes when source and destination are both word
- *    aligned. (Only applied to the non-overfetching version).
- * 5. Add half-word copier for small sizes when the source and destination are both
- *    half-word aligned (non-overfetching version).
- * 6. Split write alignment option into seperate versions using macro.
- * 7. Add block write size variants :16 (default), or 8.
- * To do: Apply arm_align=32 to the unaligned macro cases.
+ * 2. Add non-overfetching memcpy version. Various optimizations for this version
+ *    are documented in the git log. The function is split into several variants
+ *    using macros.
  */
 
 /* Prevent the stack from becoming executable */
@@ -272,7 +262,7 @@ asm_function memcpy_armv5te
  * Helper macro for non-overfetching version.
  */
 
-.macro  UNALIGNED_MEMCPY_NO_OVERFETCH shift, write_align, block_write_size
+.macro  UNALIGNED_MEMCPY_NO_OVERFETCH shift, write_align, block_write_size, preload_offset
     sub     r1, #(\shift)
     ldr     ip, [r1], #4
 
@@ -293,13 +283,13 @@ asm_function memcpy_armv5te
     stmiane r0!, {r3-r4}
     cmp     r2, #32
     blt     3f
-    cmp     r2, #128
+    cmp     r2, #\preload_offset
     pld     [r1, #48]
     stmfd   sp!, {r7, r8, r9, r10, r11}
-    add     r3, r1, #128
+    add     r3, r1, #\preload_offset
     bic     r3, r3, #31
     sub     r9, r3, r1
-    /* If there are less than 128 bytes to go, skip the main loop. */
+    /* If there are less than preload_offset bytes to go, skip the main loop. */
     blt     4f
 1:
     pld     [r1, r9]
@@ -308,7 +298,7 @@ asm_function memcpy_armv5te
     ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
     orr     r3, r3, r4, asl #(32 - \shift * 8)
     mov     r4, r4, lsr #(\shift * 8)
-    cmp     r2, #128
+    cmp     r2, #\preload_offset
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
 .if \block_write_size == 8
@@ -435,11 +425,14 @@ asm_function memcpy_armv5te
 
 /*
  * Macro that defines the main body of a memcpy version with no over-fetching
- * beyond the source memory region. write_align must be 32 or 16,
+ * beyond the source memory region.
+ *
+ * write_align must be 32 or 16,
  * block_write_size must be 32, 16 or 8.
+ * preload_offset must be a multiple of 32, 96 was the default setting.
  */
 
-.macro MEMCPY_NO_OVERFETCH write_align, block_write_size
+.macro MEMCPY_NO_OVERFETCH write_align, block_write_size, preload_offset
 .if \write_align == 32
     cmp     r2, #36
 .else
@@ -482,33 +475,33 @@ asm_function memcpy_armv5te
     subne   r2, r2, #16
     stmiane r0!, {r3-r6}
 .endif
-    add     r9, r1, #96
+    add     r9, r1, #\preload_offset
     cmp     r2, #32
     bic     r9, r9, #31
     /* If there are less than 32 bytes to go, skip all loops. */
     blt     2f
-    cmp     r2, #96
+    cmp     r2, #\preload_offset
     sub     r9, r9, r1
-    /* If there are less than 96 bytes to go, skip the main loop. */
+    /* If there are less than preload_offset bytes to go, skip the main loop. */
     blt     10f
 1:
     sub     r2, r2, #32
 .if \block_write_size == 32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #96
+    cmp     r2, #\preload_offset
     pld     [r1, r9]
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
 .endif
 .if \block_write_size == 16
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #96
+    cmp     r2, #\preload_offset
     pld     [r1, r9]
     stmia   r0!, {r3-r6}
     stmia   r0!, {r7, r8, r10, r11}
 .endif
 .if \block_write_size == 8
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #96
+    cmp     r2, #\preload_offset
     stmia   r0!, {r3-r4}
     stmia   r0!, {r5-r6}
     pld     [r1, r9]
@@ -566,11 +559,11 @@ asm_function memcpy_armv5te
 6:
     tst    r1, #2
     bne    8f
-    UNALIGNED_MEMCPY_NO_OVERFETCH 1, \write_align, \block_write_size
+    UNALIGNED_MEMCPY_NO_OVERFETCH 1, \write_align, \block_write_size, preload_offset
 7:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 2, \write_align, \block_write_size
+    UNALIGNED_MEMCPY_NO_OVERFETCH 2, \write_align, \block_write_size, preload_offset
 8:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 3, \write_align, \block_write_size
+    UNALIGNED_MEMCPY_NO_OVERFETCH 3, \write_align, \block_write_size, preload_offset
 9:
     /*
      * Size < 36.
@@ -634,23 +627,47 @@ asm_function memcpy_armv5te
 .endm
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8
-    MEMCPY_NO_OVERFETCH 16, 8
+    MEMCPY_NO_OVERFETCH 16, 8, 96
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16
-    MEMCPY_NO_OVERFETCH 16, 16
+    MEMCPY_NO_OVERFETCH 16, 16, 96
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_8
-    MEMCPY_NO_OVERFETCH 32, 8
+    MEMCPY_NO_OVERFETCH 32, 8, 96
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16
-    MEMCPY_NO_OVERFETCH 32, 16
+    MEMCPY_NO_OVERFETCH 32, 16, 96
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32
-    MEMCPY_NO_OVERFETCH 32, 32
+    MEMCPY_NO_OVERFETCH 32, 32, 96
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_64
+    MEMCPY_NO_OVERFETCH 32, 32, 64
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_96
+    MEMCPY_NO_OVERFETCH 32, 32, 96
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_128
+    MEMCPY_NO_OVERFETCH 32, 32, 128
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_160
+    MEMCPY_NO_OVERFETCH 32, 32, 160
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_192
+    MEMCPY_NO_OVERFETCH 32, 32, 192
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_256
+    MEMCPY_NO_OVERFETCH 32, 32, 256
 .endfunc
 
 #endif

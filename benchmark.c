@@ -27,6 +27,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <time.h>
 #include <sys/time.h>
 
@@ -35,7 +36,7 @@
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
-#define NU_MEMCPY_VARIANTS 8
+#define NU_MEMCPY_VARIANTS 13
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
@@ -58,7 +59,13 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 16",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 8",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16",
-    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32"
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 64",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 96",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 128",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 160",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 192",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 256"
+
 };
 
 static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
@@ -69,7 +76,12 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy_armv5te_no_overfetch_align_16_block_write_16,
     memcpy_armv5te_no_overfetch_align_32_block_write_8,
     memcpy_armv5te_no_overfetch_align_32_block_write_16,
-    memcpy_armv5te_no_overfetch_align_32_block_write_32
+    memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_64,
+    memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_96,
+    memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_128,
+    memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_160,
+    memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_192,
+    memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_256
 };
 
 static double get_time() {
@@ -414,14 +426,15 @@ static void usage() {
             printf("Commands:\n"
                 "--list          List test numbers and memcpy variants.\n"
                 "--test <number> Perform test <number> only, 5 times for each memcpy variant.\n"
-                "--quick         Perform each test once for each memcpy variant.\n"
+                "--quick         Shorthand for --duration 1 -repeat 2.\n"
                 "--all           Perform each test 5 times for each memcpy variant.\n"
                 "--help          Show this message.\n"
                 "Options:\n"
                 "--duration <n>  Sets the duration of each individual test. Default is 2 seconds.\n"
+                "--repeat <n>    Repeat each test n times. Default is 5.\n"
                 "--memcpy <list> Instead of testing all memcpy variants, test only the memcpy variants\n"
-                "                in <list>. <list> is a string of digits from 0 to 4, corresponding\n"
-                "                to each memcpy variant (for example, 0123456 select all variants).\n"
+                "                in <list>. <list> is a string of characters from a to h or higher, corresponding\n"
+                "                to each memcpy variant (for example, abcdef selects the first six variants).\n"
                 );
 }
 
@@ -434,6 +447,7 @@ int main(int argc, char *argv[]) {
     int command_test = - 1;
     int command_quick = 0;
     int command_all = 0;
+    int repeat = 5;
     for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
         memcpy_mask[i] = 1;
     for (;;) {
@@ -450,7 +464,8 @@ int main(int argc, char *argv[]) {
             continue;
         }
         if (strcasecmp(argv[argi], "--quick") == 0) {
-            command_quick = 1;
+            test_duration = 1.0;
+            repeat = 2;
             argi++;
             continue;
         }
@@ -465,7 +480,7 @@ int main(int argc, char *argv[]) {
                 printf("%3d    %s\n", i, test[i].name);
             printf("memcpy variants:\n");
             for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
-                printf("%3d    %s\n", i, memcpy_variant_name[i]);
+                printf("  %c    %s\n", 'a' + i, memcpy_variant_name[i]);
             return 0;
         }
         if (strcasecmp(argv[argi], "--help") == 0) {
@@ -486,8 +501,17 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
                 memcpy_mask[i] = 0;
             for (int i = 0; i < strlen(argv[argi + 1]); i++)
-                if (argv[argi + 1][i] >= '0' && argv[argi + 1][i] <= '0'+ NU_MEMCPY_VARIANTS - 1)
-                    memcpy_mask[argv[argi + 1][i] - '0'] = 1;
+                if (toupper(argv[argi + 1][i]) >= 'A' && toupper(argv[argi + 1][i]) <= 'A' + NU_MEMCPY_VARIANTS - 1)
+                    memcpy_mask[toupper(argv[argi + 1][i]) - 'A'] = 1;
+            argi += 2;
+            continue;
+        }
+        if (argi + 1 < argc && strcasecmp(argv[argi], "--repeat") == 0) {
+            repeat = atoi(argv[argi + 1]);
+            if (repeat < 1 || repeat >= 1000) {
+                printf("Number of repeats out of range.\n");
+                return 1;
+            }
             argi += 2;
             continue;
         }
@@ -495,8 +519,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if ((command_test != -1) + command_all + command_quick != 1) {
-        printf("Specify only one of --test, --quick or --all.\n");
+    if ((command_test != -1) + command_all != 1) {
+        printf("Specify only one of --test and --all.\n");
         return 1;
     }
 
@@ -532,7 +556,7 @@ int main(int argc, char *argv[]) {
             if (memcpy_mask[j]) {
                 printf("%s:\n", memcpy_variant_name[j]);
                 memcpy_func = memcpy_variant[j];
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < repeat; i++)
                     do_test(test[t].name, test[t].test_func, test[t].bytes);
             }
     }
