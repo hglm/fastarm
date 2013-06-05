@@ -60,6 +60,7 @@
     .global \function_name
 .func \function_name
 .type \function_name, function
+.p2align 5
 \function_name:
 .endm
 
