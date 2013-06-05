@@ -435,7 +435,7 @@ asm_function memcpy_armv5te_no_overfetch
     stmiane r0!, {r3-r4}
 #if ARM_ALIGN == 32
     tst     r0, #16
-    ldmiane r1, {r3-r6}
+    ldmiane r1!, {r3-r6}
     subne   r2, r2, #16
     stmiane r0!, {r3-r6}
 #endif
