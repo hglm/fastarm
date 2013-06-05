@@ -33,7 +33,9 @@
  *    aligned. (Only applied to the non-overfetching version).
  * 5. Add half-word copier for small sizes when the source and destination are both
  *    half-word aligned (non-overfetching version).
- * To do: Apply ARM_ALIGN=32 to the unaligned macro cases.
+ * 6. Split write alignment option into seperate versions using macro.
+ * 7. Add block write size variants :16 (default), or 8.
+ * To do: Apply arm_align=32 to the unaligned macro cases.
  */
 
 /* Prevent the stack from becoming executable */
@@ -269,7 +271,7 @@ asm_function memcpy_armv5te
  * Helper macro for non-overfetching version.
  */
 
-.macro  UNALIGNED_MEMCPY_NO_OVERFETCH shift
+.macro  UNALIGNED_MEMCPY_NO_OVERFETCH shift, write_align, block_write_size
     sub     r1, #(\shift)
     ldr     ip, [r1], #4
 
@@ -308,19 +310,35 @@ asm_function memcpy_armv5te
     cmp     r2, #128
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
+.if \block_write_size == 8
+    stmia   r0!, {r3-r4}
+.endif
     orr     r5, r5, r6, asl #(32 - \shift * 8)
     mov     r6, r6, lsr #(\shift * 8)
     orr     r6, r6, r7, asl #(32 - \shift * 8)
+.if \block_write_size == 16
     stmia   r0!, {r3-r6}
+.endif
+.if \block_write_size == 8
+    stmia   r0!, {r5-r6}
+.endif
     mov     r7, r7, lsr #(\shift * 8)
     orr     r7, r7, r8, asl #(32 - \shift * 8)
     mov     r8, r8, lsr #(\shift * 8)
     orr     r8, r8, r10, asl #(32 - \shift * 8)
     mov     r10, r10, lsr #(\shift * 8)
+.if \block_write_size == 8
+    stmia   r0!, {r7-r8}
+.endif
     orr     r10, r10, r11, asl #(32 - \shift * 8)
     mov     r11, r11, lsr #(\shift * 8)
     orr     r11, r11, ip, asl #(32 - \shift * 8)
+.if \block_write_size == 16
     stmia   r0!, {r7, r8, r10, r11}
+.endif
+.if \block_write_size == 8
+    stmia   r0!, {r10-r11}
+.endif
     bge     1b
 4:
     sub     r2, r2, #32
@@ -331,19 +349,35 @@ asm_function memcpy_armv5te
     cmp     r2, #32
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
+.if \block_write_size == 8
+    stmia   r0!, {r3-r4}
+.endif
     orr     r5, r5, r6, asl #(32 - \shift * 8)
     mov     r6, r6, lsr #(\shift * 8)
     orr     r6, r6, r7, asl #(32 - \shift * 8)
+.if \block_write_size == 16
     stmia   r0!, {r3-r6}
+.endif
+.if \block_write_size == 8
+    stmia   r0!, {r5-r6}
+.endif
     mov     r7, r7, lsr #(\shift * 8)
     orr     r7, r7, r8, asl #(32 - \shift * 8)
     mov     r8, r8, lsr #(\shift * 8)
     orr     r8, r8, r10, asl #(32 - \shift * 8)
     mov     r10, r10, lsr #(\shift * 8)
+.if \block_write_size == 8
+    stmia   r0!, {r7-r8}
+.endif
     orr     r10, r10, r11, asl #(32 - \shift * 8)
     mov     r11, r11, lsr #(\shift * 8)
     orr     r11, r11, ip, asl #(32 - \shift * 8)
+.if \block_write_size == 16
     stmia   r0!, {r7, r8, r10, r11}
+.endif
+.if \block_write_size == 8
+    stmia   r0!, {r10-r11}
+.endif
     bge     4b
 2:
     ldmfd   sp!, {r7, r8, r9, r10, r11}
@@ -393,15 +427,17 @@ asm_function memcpy_armv5te
 .endm
 
 /*
- * Version with no over-fetching beyond the source memory region.
+ * Macro that defines the main body of a memcpy version with no over-fetching
+ * beyond the source memory region. write_align must be 32 or 16,
+ * block_write_size must be 16 or 8.
  */
 
-asm_function memcpy_armv5te_no_overfetch
-#if ARM_ALIGN == 32
+.macro MEMCPY_NO_OVERFETCH write_align, block_write_size
+.if \write_align == 32
     cmp     r2, #36
-#else
+.else
     cmp     r2, #20
-#endif
+.endif
     blt     9f
     /* copy data until destination address is 4 bytes aligned */
     stmfd   sp!, {r0, r4}
@@ -433,12 +469,12 @@ asm_function memcpy_armv5te_no_overfetch
     ldmiane r1!, {r3-r4}
     subne   r2, r2, #8
     stmiane r0!, {r3-r4}
-#if ARM_ALIGN == 32
+.if \write_align == 32
     tst     r0, #16
     ldmiane r1!, {r3-r6}
     subne   r2, r2, #16
     stmiane r0!, {r3-r6}
-#endif
+.endif
     add     r9, r1, #96
     cmp     r2, #32
     bic     r9, r9, #31
@@ -450,19 +486,42 @@ asm_function memcpy_armv5te_no_overfetch
     blt     10f
 1:
     sub     r2, r2, #32
+.if \block_write_size == 16
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     cmp     r2, #96
     pld     [r1, r9]
     stmia   r0!, {r3-r6}
     stmia   r0!, {r7, r8, r10, r11}
+.endif
+.if \block_write_size == 8
+    ldmia   r1!, {r3-r6}
+    cmp     r2, #96
+    stmia   r0!, {r3-r4}
+    stmia   r0!, {r5-r6}
+    ldmia   r1!, {r7, r8, r10, r11}
+    pld     [r1, r9]
+    stmia   r0!, {r7-r8}
+    stmia   r0!, {r10-r11}
+.endif
     bge     1b
 10:
     sub     r2, r2, #32
+.if \block_write_size == 16
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     cmp     r2, #32
     pld     [r1, r9]
     stmia   r0!, {r3-r6}
     stmia   r0!, {r7, r8, r10, r11}
+.endif
+.if \block_write_size == 8
+    ldmia   r1!, {r3-r6}
+    cmp     r2, #32
+    stmia   r0!, {r3-r4}
+    stmia   r0!, {r5-r6}
+    ldmia   r1!, {r7, r8, r10, r11}
+    stmia   r0!, {r7-r8}
+    stmia   r0!, {r10-r11}
+.endif
     bge     10b
 2:
     ldmfd   sp!, {r7, r8, r9, r10, r11}
@@ -490,11 +549,11 @@ asm_function memcpy_armv5te_no_overfetch
 6:
     tst    r1, #2
     bne    8f
-    UNALIGNED_MEMCPY_NO_OVERFETCH 1
+    UNALIGNED_MEMCPY_NO_OVERFETCH 1, \write_align, \block_write_size
 7:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 2
+    UNALIGNED_MEMCPY_NO_OVERFETCH 2, \write_align, \block_write_size
 8:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 3
+    UNALIGNED_MEMCPY_NO_OVERFETCH 3, \write_align, \block_write_size
 9:
     /*
      * Size < 36.
@@ -555,6 +614,22 @@ asm_function memcpy_armv5te_no_overfetch
     ldmfd  sp!, {r0, r4}
     strbne r3, [ip], #1
     bx     lr
+.endm
+
+asm_function memcpy_armv5te_no_overfetch_align_16
+    MEMCPY_NO_OVERFETCH 16, 16
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8
+    MEMCPY_NO_OVERFETCH 16, 8
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32
+    MEMCPY_NO_OVERFETCH 32, 16
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_8
+    MEMCPY_NO_OVERFETCH 32, 8
 .endfunc
 
 #endif

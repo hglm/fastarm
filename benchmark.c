@@ -35,27 +35,40 @@
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
+#define NU_MEMCPY_VARIANTS 7
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
 memcpy_func_type memcpy_func;
 memcpy_func_type standard_memcpy_func, fastarm_memcpy_func, armv5te_memcpy_func;
-memcpy_func_type armv5te_no_overfetch_memcpy_func;
+memcpy_func_type armv5te_no_overfetch_align_16_memcpy_func;
+memcpy_func_type armv5te_no_overfetch_align_16_block_write_8_memcpy_func;
+memcpy_func_type armv5te_no_overfetch_align_32_memcpy_func;
+memcpy_func_type armv5te_no_overfetch_align_32_block_write_8_memcpy_func;
 uint8_t *buffer_chunk, *buffer_page;
 int *random_buffer_1024;
 double test_duration = DEFAULT_TEST_DURATION;
+int memcpy_mask[NU_MEMCPY_VARIANTS];
 
-static void *fastarm_memcpy_wrapper(void *dest, const void *src, size_t n) {
-    return fastarm_memcpy(dest, src, n);
-}
+static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
+    "standard memcpy",
+    "libfastarm memcpy",
+    "armv5te memcpy",
+    "armv5te non-overfetching memcpy with write alignment of 16",
+    "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 8",
+    "armv5te non-overfetching memcpy with write alignment of 32",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 8"
+};
 
-static void *armv5te_memcpy_wrapper(void *dest, const void *src, size_t n) {
-    return memcpy_armv5te(dest, src, n);
-}
-
-static void *armv5te_no_overfetch_memcpy_wrapper(void *dest, const void *src, size_t n) {
-    return memcpy_armv5te_no_overfetch(dest, src, n);
-}
+static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
+    memcpy,
+    fastarm_memcpy,
+    memcpy_armv5te,
+    memcpy_armv5te_no_overfetch_align_16,
+    memcpy_armv5te_no_overfetch_align_16_block_write_8,
+    memcpy_armv5te_no_overfetch_align_32,
+    memcpy_armv5te_no_overfetch_align_32_block_write_8
+};
 
 static double get_time() {
    struct timespec ts;
@@ -336,18 +349,12 @@ static void do_test_both(const char *name, void (*test_func)(), int bytes) {
 }
 
 static void do_test_all(const char *name, void (*test_func)(), int bytes) {
-    memcpy_func = standard_memcpy_func;
-    printf("standard memcpy: ");
-    do_test(name, test_func, bytes);
-    memcpy_func = fastarm_memcpy_func;
-    printf("fastarm memcpy: ");
-    do_test(name, test_func, bytes);
-    memcpy_func = armv5te_memcpy_func;
-    printf("armv5te memcpy: ");
-    do_test(name, test_func, bytes);
-    memcpy_func = armv5te_no_overfetch_memcpy_func;
-    printf("armv5te non-overfetching memcpy: ");
-    do_test(name, test_func, bytes);
+    for (int j = 0; j < NU_MEMCPY_VARIANTS; j++)
+        if (memcpy_mask[j]) {
+            printf("%s:\n", memcpy_variant_name[j]);
+            memcpy_func = memcpy_variant[j];
+            do_test(name, test_func, bytes);
+        }
 }
 
 #define NU_TESTS 34
@@ -403,13 +410,16 @@ test_t test[NU_TESTS] = {
 
 static void usage() {
             printf("Commands:\n"
-                "--list          List test numbers.\n"
+                "--list          List test numbers and memcpy variants.\n"
                 "--test <number> Perform test <number> only, 5 times for each memcpy variant.\n"
-                "--quick         Perform each tests once for each memcpy variant.\n"
+                "--quick         Perform each test once for each memcpy variant.\n"
                 "--all           Perform each test 5 times for each memcpy variant.\n"
                 "--help          Show this message.\n"
                 "Options:\n"
                 "--duration <n>  Sets the duration of each individual test. Default is 2 seconds.\n"
+                "--memcpy <list> Instead of testing all memcpy variants, test only the memcpy variants\n"
+                "                in <list>. <list> is a string of digits from 0 to 4, corresponding\n"
+                "                to each memcpy variant (for example, 01234 select all variants).\n"
                 );
 }
 
@@ -422,6 +432,8 @@ int main(int argc, char *argv[]) {
     int command_test = - 1;
     int command_quick = 0;
     int command_all = 0;
+    for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
+        memcpy_mask[i] = 1;
     for (;;) {
         if (argi >= argc)
             break;
@@ -446,8 +458,12 @@ int main(int argc, char *argv[]) {
             continue;
         }
         if (strcasecmp(argv[argi], "--list") == 0) {
+            printf("Tests:\n");
             for (int i = 0; i < NU_TESTS; i++)
                 printf("%3d    %s\n", i, test[i].name);
+            printf("memcpy variants:\n");
+            for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
+                printf("%3d    %s\n", i, memcpy_variant_name[i]);
             return 0;
         }
         if (strcasecmp(argv[argi], "--help") == 0) {
@@ -461,6 +477,15 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
             test_duration = d;
+            argi += 2;
+            continue;
+        }
+        if (argi + 1 < argc && strcasecmp(argv[argi], "--memcpy") == 0) {
+            for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
+                memcpy_mask[i] = 0;
+            for (int i = 0; i < strlen(argv[argi + 1]); i++)
+                if (argv[argi + 1][i] >= '0' && argv[argi + 1][i] <= '0'+ NU_MEMCPY_VARIANTS - 1)
+                    memcpy_mask[argv[argi + 1][i] - '0'] = 1;
             argi += 2;
             continue;
         }
@@ -482,17 +507,9 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < RANDOM_BUFFER_SIZE; i++)
         random_buffer_1024[i] = rand() % 1023;
 
-    standard_memcpy_func = memcpy;
-    if (sizeof(size_t) == sizeof(int)) {
-        fastarm_memcpy_func = fastarm_memcpy;
-        armv5te_memcpy_func = memcpy_armv5te;
-        armv5te_no_overfetch_memcpy_func = memcpy_armv5te_no_overfetch;
-    }
-    else {
-        printf("Using wrappers for fastarm_memcpy and armv5te_memcpy.\n");
-        fastarm_memcpy_func = fastarm_memcpy_wrapper;
-        armv5te_memcpy_func = armv5te_memcpy_wrapper;
-        armv5te_no_overfetch_memcpy_func = armv5te_no_overfetch_memcpy_wrapper;
+    if (sizeof(size_t) != sizeof(int)) {
+        printf("sizeof(size_t) != sizeof(int), unable to directly replace memcpy.\n");
+        return 1;
     }
 
     if (command_quick) {
@@ -508,22 +525,13 @@ int main(int argc, char *argv[]) {
         start_test = command_test;
         end_test = command_test;
     }
-    for (int t = start_test; t <= end_test; t++) { 
-        printf("standard memcpy:\n");
-        memcpy_func = standard_memcpy_func;
-        for (int i = 0; i < 5; i++)
-            do_test(test[t].name, test[t].test_func, test[t].bytes);
-        printf("fastarm memcpy:\n");
-        memcpy_func = fastarm_memcpy_func;
-        for (int i = 0; i < 5; i++)
-            do_test(test[t].name, test[t].test_func, test[t].bytes);
-        printf("armv5te memcpy:\n");
-        memcpy_func = armv5te_memcpy_func;
-        for (int i = 0; i < 5; i++)
-            do_test(test[t].name, test[t].test_func, test[t].bytes);
-        printf("armv5te non-overfetching memcpy:\n");
-        memcpy_func = armv5te_no_overfetch_memcpy_func;
-        for (int i = 0; i < 5; i++)
-            do_test(test[t].name, test[t].test_func, test[t].bytes);
-   }
-}
+    for (int t = start_test; t <= end_test; t++) {
+        for (int j = 0; j < NU_MEMCPY_VARIANTS; j++)
+            if (memcpy_mask[j]) {
+                printf("%s:\n", memcpy_variant_name[j]);
+                memcpy_func = memcpy_variant[j];
+                for (int i = 0; i < 5; i++)
+                    do_test(test[t].name, test[t].test_func, test[t].bytes);
+            }
+    }
+ }
