@@ -316,13 +316,13 @@ asm_function memcpy_armv5te
     orr     r5, r5, r6, asl #(32 - \shift * 8)
     mov     r6, r6, lsr #(\shift * 8)
     orr     r6, r6, r7, asl #(32 - \shift * 8)
+    mov     r7, r7, lsr #(\shift * 8)
 .if \block_write_size == 16
     stmia   r0!, {r3-r6}
 .endif
 .if \block_write_size == 8
     stmia   r0!, {r5-r6}
 .endif
-    mov     r7, r7, lsr #(\shift * 8)
     orr     r7, r7, r8, asl #(32 - \shift * 8)
     mov     r8, r8, lsr #(\shift * 8)
     orr     r8, r8, r10, asl #(32 - \shift * 8)
@@ -333,6 +333,9 @@ asm_function memcpy_armv5te
     orr     r10, r10, r11, asl #(32 - \shift * 8)
     mov     r11, r11, lsr #(\shift * 8)
     orr     r11, r11, ip, asl #(32 - \shift * 8)
+.if \block_write_size == 32
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+.endif
 .if \block_write_size == 16
     stmia   r0!, {r7, r8, r10, r11}
 .endif
@@ -355,13 +358,13 @@ asm_function memcpy_armv5te
     orr     r5, r5, r6, asl #(32 - \shift * 8)
     mov     r6, r6, lsr #(\shift * 8)
     orr     r6, r6, r7, asl #(32 - \shift * 8)
+    mov     r7, r7, lsr #(\shift * 8)
 .if \block_write_size == 16
     stmia   r0!, {r3-r6}
 .endif
 .if \block_write_size == 8
     stmia   r0!, {r5-r6}
 .endif
-    mov     r7, r7, lsr #(\shift * 8)
     orr     r7, r7, r8, asl #(32 - \shift * 8)
     mov     r8, r8, lsr #(\shift * 8)
     orr     r8, r8, r10, asl #(32 - \shift * 8)
