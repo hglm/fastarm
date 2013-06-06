@@ -36,7 +36,7 @@
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
-#define NU_MEMCPY_VARIANTS 28
+#define NU_MEMCPY_VARIANTS 29
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
@@ -65,6 +65,7 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 160",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 192",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 256",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, preload offset 96 with early preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, preload offset 128 with early preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, preload offset 192 with early preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, preload offset 256 with early preload",
@@ -96,6 +97,7 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_160,
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_192,
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_256,
+    memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_96,
     memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_128,
     memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_192,
     memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_256,
