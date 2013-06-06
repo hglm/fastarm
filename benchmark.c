@@ -36,7 +36,7 @@
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
-#define NU_MEMCPY_VARIANTS 21
+#define NU_MEMCPY_VARIANTS 22
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
@@ -72,6 +72,7 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 256",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, preload offset 128 with early preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 128 with early preload",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, no preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, no preload"
 };
 
