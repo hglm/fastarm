@@ -26,6 +26,8 @@
  * 2. Add non-overfetching memcpy version. Various optimizations for this version
  *    are documented in the git log. The function is split into several variants
  *    using macros.
+ *    To do: -- Implement write-align == 32 for unaligned case.
+ *           -- Implement line_size == 64 and write_align == 64 for unaligned case.
  */
 
 /* Prevent the stack from becoming executable */
@@ -430,16 +432,20 @@ asm_function memcpy_armv5te
  * Macro that defines the main body of a memcpy version with no over-fetching
  * beyond the source memory region.
  *
- * write_align must be 32 or 16,
+ * line_size must be 32 or 64.
+ * write_align must be 32 or 16, or 64.
  * block_write_size must be 32, 16 or 8.
  * preload_offset must be a multiple of 32, 96 was the default setting. When preload_offset is 0,
  * no preload instructions will be generated at all.
  * preload_early must be 0 or 1. 1 is only allowed if write_align is 32.
+ *
+ * If line_size is 64, write_align must be 64, block_write_size must be 32, and preload_offset
+ * must be a multiple of 64.
  */
 
-.macro MEMCPY_NO_OVERFETCH write_align, block_write_size, preload_offset, preload_early
+.macro MEMCPY_NO_OVERFETCH line_size, write_align, block_write_size, preload_offset, preload_early
 .if \preload_early == 1
-    bic     r3, r1, #31
+    bic     r3, r1, #(\line_size - 1)
 .endif
 .if \write_align == 32
     cmp     r2, #36
@@ -460,7 +466,7 @@ asm_function memcpy_armv5te
     subne   r2, r2, #1
     strbne  r3, [r0], #1
 .if \preload_early == 1
-    pld     [r4, #32]
+    pld     [r4, #\line_size]
 .endif
     stmfd   sp!, {r5, r6}
     tst     r0, #2
@@ -486,29 +492,51 @@ asm_function memcpy_armv5te
     ldmiane r1!, {r3, r5}
     subne   r2, r2, #8
     stmiane r0!, {r3, r5}
-.if \write_align == 32
+.if \write_align == 32 || \write_align == 64
     tst     r0, #16
     ldmiane r1!, {r3, r5-r7}
     subne   r2, r2, #16
     stmiane r0!, {r3, r5-r7}
 .endif
-.if \preload_offset != 0
-    /* Note in the case of write_align == 32 r9 will be equal to preload_offset. */
-    add     r9, r1, #\preload_offset
-.endif
+.if \write_align == 64
     cmp     r2, #32
-.if \preload_offset != 0
-    bic     r9, r9, #31
+    blt     14f
+    tst     r0, #32
+    ldmiane r1!, {r3, r5-r11}
+    subne   r2, r2, #32
+    stmiane r0!, {r3, r5-r11}
 .endif
+    /* Source is now write_align bytes aligned. */
+.if \preload_offset == 0
+    cmp     r2, #32
+    blt     2f
+.elseif \write_align == 64
+    cmp     r2, #64
+    mov     r9, #\preload_offset
+    blt     2f
+    cmp     r2, #(\preload_offset + 64)
+    ble     10f
+.elseif \write_align == 32
+    /* In the case of write_align == 32 r9 will be equal to preload_offset. */
+    cmp     r2, #32
+    mov     r9, #\preload_offset
+    blt     2f
+    cmp     r2, #(\preload_offset + 32)
+    ble     10f
+.else
+    add     r9, r1, #\preload_offset
+    cmp     r2, #32
+    bic     r9, r9, #31
     /* If there are less than 32 bytes to go, skip all loops. */
     blt     2f
-.if \preload_offset != 0
     cmp     r2, #(\preload_offset + 32)
     sub     r9, r9, r1
     /* If there are <= (preload_offset + 32) bytes to go, skip the main loop. */
     ble     10f
+.endif
+.if \preload_offset != 0
 .if \preload_early == 1
-    pld     [r4, #64]
+    pld     [r4, #(\line_size * 2)]
 .if \write_align == 32 && \block_write_size == 16 && \preload_offset >= 128
     cmp     r2, #(\preload_offset + 128)
     blt     1f
@@ -521,28 +549,35 @@ asm_function memcpy_armv5te
     pld     [ip]
     stmia   r0!, {r3-r6}
     sub     r4, ip, r1
-    add     r4, r4, #64
+    add     r4, r4, #32
     cmp     r2, r4
     stmia   r0!, {r7, r8, r10, r11}
+    /* Jump if the next preload would overfetch, */
     blt     13f
     sub     r2, r2, #32
     pld     [ip, #32]
+    cmp     r2, r4
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     stmia   r0!, {r3-r6}
+    /* Jump if the next preload would overfetch, */
+    stmialt r0!, {r7, r8, r10, r11}
+    blt     13f
     sub     r4, ip, r1
     add     r4, r4, #96
     cmp     r2, r4
     pld     [ip, #64]
     stmia   r0!, {r7, r8, r10, r11}
+    /* Jump if the next preload would overfetch, */
     blt     13f
     sub     r2, r2, #32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     pld     [ip, #96]
     stmia   r0!, {r3-r6}
-    stmia   r0!, {r7, r8, r10, r11}
     sub     r4, ip, r1
     add     r4, r4, #128
+    stmia   r0!, {r7, r8, r10, r11}
     cmp     r2, r4
+    /* Jump if the next preload would overfetch, */
     blt     13f
     sub     r2, r2, #32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
@@ -560,6 +595,15 @@ asm_function memcpy_armv5te
 .endif
 .endif
 1:
+.if \line_size == 64
+    sub     r2, r2, #64
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    cmp     r2, #(\preload_offset + 64)
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    pld     [r1, r9]
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+.else
     sub     r2, r2, #32
 .if \block_write_size == 32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
@@ -580,12 +624,21 @@ asm_function memcpy_armv5te
     stmia   r0!, {r3-r4}
     stmia   r0!, {r5-r6}
     pld     [r1, r9]
-    stmia   r0!, {r7-r8}
-    stmia   r0!, {r10-r11}
+    stmia   r0, {r7-r8}
+    stmia   r0, {r10-r11}
 .endif
     bge     1b
+.endif /* line_size ==  64 */
 .endif /* preload != 0 */
 10:
+.if \line_size == 64
+    sub     r2, r2, #64
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    cmp     r2, #64
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+.else
     sub     r2, r2, #32
 .if \block_write_size == 32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
@@ -606,8 +659,15 @@ asm_function memcpy_armv5te
     stmia   r0!, {r7-r8}
     stmia   r0!, {r10-r11}
 .endif
+.endif /* line_size == 64 */
     bge     10b
 2:
+.if \line_size == 64
+    tst     r2, #32
+    ldmiane r1!, {r3-r6, r7, r8, r10, r11}
+    stmiane r0!, {r3-r6, r7, r8, r10, r11}
+.endif
+14:
     ldmfd   sp!, {r7, r8, r9, r10, r11}
     tst     r2, #16
     ldmiane r1!, {r3-r6}
@@ -705,91 +765,103 @@ asm_function memcpy_armv5te
 .endm
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8
-    MEMCPY_NO_OVERFETCH 16, 8, 96, 0
+    MEMCPY_NO_OVERFETCH 32, 16, 8, 96, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16
-    MEMCPY_NO_OVERFETCH 16, 16, 96, 0
+    MEMCPY_NO_OVERFETCH 32, 16, 16, 96, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_8
-    MEMCPY_NO_OVERFETCH 32, 8, 96, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 8, 96, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_64
-    MEMCPY_NO_OVERFETCH 32, 16, 64 0
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 64 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_96
-    MEMCPY_NO_OVERFETCH 32, 16, 96, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 96, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_128
-    MEMCPY_NO_OVERFETCH 32, 16, 128, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 128, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_160
-    MEMCPY_NO_OVERFETCH 32, 16, 160, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 160, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_192
-    MEMCPY_NO_OVERFETCH 32, 16, 192, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 192, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_256
-    MEMCPY_NO_OVERFETCH 32, 16, 256, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 256, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_64
-    MEMCPY_NO_OVERFETCH 32, 32, 64, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 32, 64, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_96
-    MEMCPY_NO_OVERFETCH 32, 32, 96, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 32, 96, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_128
-    MEMCPY_NO_OVERFETCH 32, 32, 128, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 32, 128, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_160
-    MEMCPY_NO_OVERFETCH 32, 32, 160, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 32, 160, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_192
-    MEMCPY_NO_OVERFETCH 32, 32, 192, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 32, 192, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_256
-    MEMCPY_NO_OVERFETCH 32, 32, 256, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 32, 256, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_128
-    MEMCPY_NO_OVERFETCH 32, 16, 128, 1
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 128, 1
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_192
-    MEMCPY_NO_OVERFETCH 32, 16, 192, 1
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 192, 1
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_256
-    MEMCPY_NO_OVERFETCH 32, 16, 256, 1
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 256, 1
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_128
-    MEMCPY_NO_OVERFETCH 32, 32, 128, 1
+    MEMCPY_NO_OVERFETCH 32, 32, 32, 128, 1
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_256
-    MEMCPY_NO_OVERFETCH 32, 32, 256, 1
+    MEMCPY_NO_OVERFETCH 32, 32, 32, 256, 1
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_no_preload
-    MEMCPY_NO_OVERFETCH 32, 16, 0, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 16, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_no_preload
-    MEMCPY_NO_OVERFETCH 32, 32, 0, 0
+    MEMCPY_NO_OVERFETCH 32, 32, 32, 0, 0
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_128
+    MEMCPY_NO_OVERFETCH 64, 64, 32, 128, 0
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_192
+    MEMCPY_NO_OVERFETCH 64, 64, 32, 192, 0
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_256
+    MEMCPY_NO_OVERFETCH 64, 64, 32, 256, 0
 .endfunc
 
 #endif

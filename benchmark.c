@@ -36,7 +36,7 @@
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
-#define NU_MEMCPY_VARIANTS 25
+#define NU_MEMCPY_VARIANTS 28
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
@@ -71,7 +71,10 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 128 with early preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 256 with early preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, no preload",
-    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, no preload"
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, no preload",
+    "armv5te non-overfetching memcpy with write alignment of 64 and block write size of 32, preload offset 128",
+    "armv5te non-overfetching memcpy with write alignment of 64 and block write size of 32, preload offset 192",
+    "armv5te non-overfetching memcpy with write alignment of 64 and block write size of 32, preload offset 256"
 };
 
 static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
@@ -99,7 +102,10 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_128,
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_256,
     memcpy_armv5te_no_overfetch_align_32_block_write_16_no_preload,
-    memcpy_armv5te_no_overfetch_align_32_block_write_32_no_preload
+    memcpy_armv5te_no_overfetch_align_32_block_write_32_no_preload,
+    memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_128,
+    memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_192,
+    memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_256,
 };
 
 static double get_time() {
@@ -499,6 +505,20 @@ static void usage() {
                 );
 }
 
+static int char_to_memcpy_variant(char c) {
+    if (c >= 'a' && c <= 'z')
+        return c - 'a';
+    if (c >= 'A' && c <= 'Z')
+        return c - 'A' + 26;
+    return - 1;
+}
+
+static char memcpy_variant_to_char(int i) {
+    if (i < 26)
+        return 'a' + i;
+    return 'A' + i - 26;
+}
+
 int main(int argc, char *argv[]) {
     if (argc == 1) {
         usage();
@@ -541,7 +561,7 @@ int main(int argc, char *argv[]) {
                 printf("%3d    %s\n", i, test[i].name);
             printf("memcpy variants:\n");
             for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
-                printf("  %c    %s\n", 'a' + i, memcpy_variant_name[i]);
+                printf("  %c    %s\n", memcpy_variant_to_char(i), memcpy_variant_name[i]);
             return 0;
         }
         if (strcasecmp(argv[argi], "--help") == 0) {
@@ -562,8 +582,8 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
                 memcpy_mask[i] = 0;
             for (int i = 0; i < strlen(argv[argi + 1]); i++)
-                if (toupper(argv[argi + 1][i]) >= 'A' && toupper(argv[argi + 1][i]) <= 'A' + NU_MEMCPY_VARIANTS - 1)
-                    memcpy_mask[toupper(argv[argi + 1][i]) - 'A'] = 1;
+                if (char_to_memcpy_variant(argv[argi + 1][i]) >= 0 && char_to_memcpy_variant(argv[argi + 1][i]) < NU_MEMCPY_VARIANTS)
+                    memcpy_mask[char_to_memcpy_variant(argv[argi + 1][i])] = 1;
             argi += 2;
             continue;
         }
