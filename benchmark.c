@@ -41,12 +41,7 @@
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
 memcpy_func_type memcpy_func;
-memcpy_func_type standard_memcpy_func, fastarm_memcpy_func, armv5te_memcpy_func;
-memcpy_func_type armv5te_no_overfetch_align_16_memcpy_func;
-memcpy_func_type armv5te_no_overfetch_align_16_block_write_8_memcpy_func;
-memcpy_func_type armv5te_no_overfetch_align_32_memcpy_func;
-memcpy_func_type armv5te_no_overfetch_align_32_block_write_8_memcpy_func;
-uint8_t *buffer_chunk, *buffer_page;
+uint8_t *buffer_alloc, *buffer_chunk, *buffer_page;
 int *random_buffer_1024;
 double test_duration = DEFAULT_TEST_DURATION;
 int memcpy_mask[NU_MEMCPY_VARIANTS];
@@ -334,10 +329,12 @@ static void test_random_mixed_sizes_DRAM_64(int i) {
 
 static void clear_data_cache() {
     int val = 0;
-    for (int i = 0; i < 1024 * 1024 * 8; i += 4) {
-        val += buffer_page[1024 * 1024 * 16 + i];
+    for (int i = 0; i < 1024 * 1024 * 32; i += 4) {
+        val += buffer_alloc[i];
     }
-    buffer_page[1024 * 1024 * 16] = val;
+    for (int i = 0; i < 1024 * 1024 * 32; i += 4) {
+        buffer_alloc[i] = val;
+    }
 }
 
 static void do_test(const char *name, void (*test_func)(int), int bytes) {
@@ -368,15 +365,6 @@ static void do_test(const char *name, void (*test_func)(int), int bytes) {
     double bandwidth = (double)bytes * nu_iterations * count / (1024 * 1024)
         / (end_time - start_time);
     printf("%s: %.2lf MB/s\n", name, bandwidth);
-}
-
-static void do_test_both(const char *name, void (*test_func)(), int bytes) {
-    memcpy_func = standard_memcpy_func;
-    printf("standard memcpy: ");
-    do_test(name, test_func, bytes);
-    memcpy_func = fastarm_memcpy_func;
-    printf("fastarm memcpy: ");
-    do_test(name, test_func, bytes);
 }
 
 static void do_test_all(const char *name, void (*test_func)(), int bytes) {
@@ -541,7 +529,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    void *buffer_alloc = malloc(1024 * 1024 * 32);
+    buffer_alloc = malloc(1024 * 1024 * 32);
     buffer_page = (uint8_t *)buffer_alloc + ((4096 - ((uintptr_t)buffer_alloc & 4095))
         & 4095);
     buffer_chunk = buffer_page + 17 * 32;
