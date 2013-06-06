@@ -97,6 +97,7 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_256,
     memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_128,
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_128,
+    memcpy_armv5te_no_overfetch_align_32_block_write_16_no_preload,
     memcpy_armv5te_no_overfetch_align_32_block_write_32_no_preload
 };
 
