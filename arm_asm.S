@@ -434,7 +434,7 @@ asm_function memcpy_armv5te
  * block_write_size must be 32, 16 or 8.
  * preload_offset must be a multiple of 32, 96 was the default setting. When preload_offset is 0,
  * no preload instructions will be generated at all.
- * preload_early must be 0 or 1.
+ * preload_early must be 0 or 1. 1 is only allowed if write_align is 32.
  */
 
 .macro MEMCPY_NO_OVERFETCH write_align, block_write_size, preload_offset, preload_early
@@ -452,16 +452,22 @@ asm_function memcpy_armv5te
     blt     9f
     /* copy data until destination address is 4 bytes aligned */
     stmfd   sp!, {r0, r4}
+.if \preload_early == 1
+    mov     r4, r3
+.endif
     tst     r0, #1
     ldrbne  r3, [r1], #1
     subne   r2, r2, #1
     strbne  r3, [r0], #1
+.if \preload_early == 1
+    pld     [r4, #32]
+.endif
     stmfd   sp!, {r5, r6}
     tst     r0, #2
     ldrbne  r3, [r1], #1
-    ldrbne  r4, [r1], #1
+    ldrbne  r5, [r1], #1
     subne   r2, r2, #2
-    orrne   r3, r3, r4, asl #8
+    orrne   r3, r3, r5, asl #8
     strhne  r3, [r0], #2
     /* destination address is 4 bytes aligned */
     /* now we should handle 4 cases of source address alignment */
@@ -473,20 +479,21 @@ asm_function memcpy_armv5te
     /* both source and destination are 4 bytes aligned */
     stmfd   sp!, {r7, r8, r9, r10, r11}
     tst     r0, #4
-    ldrne   r4, [r1], #4
+    ldrne   r5, [r1], #4
     subne   r2, r2, #4
-    strne   r4, [r0], #4
+    strne   r5, [r0], #4
     tst     r0, #8
-    ldmiane r1!, {r3-r4}
+    ldmiane r1!, {r3, r5}
     subne   r2, r2, #8
-    stmiane r0!, {r3-r4}
+    stmiane r0!, {r3, r5}
 .if \write_align == 32
     tst     r0, #16
-    ldmiane r1!, {r3-r6}
+    ldmiane r1!, {r3, r5-r7}
     subne   r2, r2, #16
-    stmiane r0!, {r3-r6}
+    stmiane r0!, {r3, r5-r7}
 .endif
 .if \preload_offset != 0
+    /* Note in the case of write_align == 32 r9 will be equal to preload_offset. */
     add     r9, r1, #\preload_offset
 .endif
     cmp     r2, #32
@@ -496,28 +503,80 @@ asm_function memcpy_armv5te
     /* If there are less than 32 bytes to go, skip all loops. */
     blt     2f
 .if \preload_offset != 0
-    cmp     r2, #\preload_offset
+    cmp     r2, #(\preload_offset + 32)
     sub     r9, r9, r1
-    /* If there are less than preload_offset bytes to go, skip the main loop. */
-    blt     10f
+    /* If there are <= (preload_offset + 32) bytes to go, skip the main loop. */
+    ble     10f
+.if \preload_early == 1
+    pld     [r4, #64]
+.if \write_align == 32 && \block_write_size == 16 && \preload_offset >= 128
+    cmp     r2, #(\preload_offset + 128)
+    blt     1f
+    /* When early preload is enabled, gradually catch up to the preload offset */
+    /* in the main loop while processing 128 bytes at a time. */
+    add     ip, r4, #96
+11:
+    sub     r2, r2, #32
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    pld     [ip]
+    stmia   r0!, {r3-r6}
+    sub     r4, ip, r1
+    add     r4, r4, #64
+    cmp     r2, r4
+    stmia   r0!, {r7, r8, r10, r11}
+    blt     13f
+    sub     r2, r2, #32
+    pld     [ip, #32]
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    stmia   r0!, {r3-r6}
+    sub     r4, ip, r1
+    add     r4, r4, #96
+    cmp     r2, r4
+    pld     [ip, #64]
+    stmia   r0!, {r7, r8, r10, r11}
+    blt     13f
+    sub     r2, r2, #32
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    pld     [ip, #96]
+    stmia   r0!, {r3-r6}
+    stmia   r0!, {r7, r8, r10, r11}
+    sub     r4, ip, r1
+    add     r4, r4, #128
+    cmp     r2, r4
+    blt     13f
+    sub     r2, r2, #32
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    pld     [ip, #128]
+    add     ip, #160
+    stmia   r0!, {r3-r6}
+    sub     r4, ip, r1
+    /* Has the offset catched up yet? */
+    cmp     r4, r9
+    stmia   r0!, {r7, r8, r10, r11}
+    bgt     11b
+13:
+    cmp     r2, #(\preload_offset + 32)
+    blt     12f
+.endif
+.endif
 1:
     sub     r2, r2, #32
 .if \block_write_size == 32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #\preload_offset
+    cmp     r2, #(\preload_offset + 32)
     pld     [r1, r9]
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
 .endif
 .if \block_write_size == 16
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #\preload_offset
+    cmp     r2, #(\preload_offset + 32)
     pld     [r1, r9]
     stmia   r0!, {r3-r6}
     stmia   r0!, {r7, r8, r10, r11}
 .endif
 .if \block_write_size == 8
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #\preload_offset
+    cmp     r2, #(\preload_offset + 32)
     stmia   r0!, {r3-r4}
     stmia   r0!, {r5-r6}
     pld     [r1, r9]
@@ -571,14 +630,18 @@ asm_function memcpy_armv5te
 
     bx      lr
 
+12:
+    cmp     r2, #32
+    bge     10b
+    b       2b
 6:
     tst    r1, #2
     bne    8f
-    UNALIGNED_MEMCPY_NO_OVERFETCH 1, \write_align, \block_write_size, preload_offset
+    UNALIGNED_MEMCPY_NO_OVERFETCH 1, \write_align, \block_write_size, \preload_offset
 7:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 2, \write_align, \block_write_size, preload_offset
+    UNALIGNED_MEMCPY_NO_OVERFETCH 2, \write_align, \block_write_size, \preload_offset
 8:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 3, \write_align, \block_write_size, preload_offset
+    UNALIGNED_MEMCPY_NO_OVERFETCH 3, \write_align, \block_write_size, \preload_offset
 9:
     /*
      * Size < 36.
@@ -703,6 +766,10 @@ asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_256
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_128
     MEMCPY_NO_OVERFETCH 32, 16, 128, 1
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_192
+    MEMCPY_NO_OVERFETCH 32, 16, 192, 1
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_256

@@ -36,7 +36,7 @@
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
-#define NU_MEMCPY_VARIANTS 24
+#define NU_MEMCPY_VARIANTS 25
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
@@ -66,6 +66,7 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 192",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 256",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, preload offset 128 with early preload",
+    "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, preload offset 192 with early preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 16, preload offset 256 with early preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 128 with early preload",
     "armv5te non-overfetching memcpy with write alignment of 32 and block write size of 32, preload offset 256 with early preload",
@@ -93,6 +94,7 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_192,
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_256,
     memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_128,
+    memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_192,
     memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_256,
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_128,
     memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_256,
@@ -331,6 +333,50 @@ static void test_random_mixed_sizes_DRAM_64(int i) {
         1 + (random_buffer_1024[((i * 4 + 2) & (RANDOM_BUFFER_SIZE - 1))] & 63));
 }
 
+static void test_random_mixed_sizes_DRAM_word_aligned_1024(int i) {
+    /* Source and destination address selected randomly from range of 8MB. */
+    memcpy_func(buffer_page +
+        // Select a random 8192 bytes aligned addres.
+        8192 * random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] +
+        // Add a random offset up to (4096 - 256) in steps of 256 based on higher bits
+        // of the iteration number.
+        ((i / (RANDOM_BUFFER_SIZE / 4)) & 15) * 256 +
+        // Add a random offset up to 1020 in steps of 4 based on the lower end bits
+        // of the iteration number.
+        (random_buffer_1024[(i * 4) & (RANDOM_BUFFER_SIZE - 1)] & (~3)),
+        buffer_page +
+        8192 * random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] +
+        ((i / (RANDOM_BUFFER_SIZE / 4)) & 15) * 256 +
+        (random_buffer_1024[(i * 4 + 1) & (RANDOM_BUFFER_SIZE - 1)] & (~3)),
+        4 + (random_buffer_1024[((i * 4 + 2) & (RANDOM_BUFFER_SIZE - 1))] & (~3)));
+}
+
+static void test_random_mixed_sizes_DRAM_word_aligned_256(int i) {
+    /* Source and destination address selected randomly from range of 8MB. */
+    memcpy_func(buffer_page +
+        8192 * random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] +
+        ((i / (RANDOM_BUFFER_SIZE / 4)) & 15) * 256 +
+        (random_buffer_1024[(i * 4) & (RANDOM_BUFFER_SIZE - 1)] & (~3)),
+        buffer_page +
+        8192 * random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] +
+        ((i / (RANDOM_BUFFER_SIZE / 4)) & 15) * 256 +
+        (random_buffer_1024[(i * 4 + 1) & (RANDOM_BUFFER_SIZE - 1)] & (~3)),
+        4 + (random_buffer_1024[((i * 4 + 2) & (RANDOM_BUFFER_SIZE - 1))] & 252));
+}
+
+static void test_random_mixed_sizes_DRAM_word_aligned_64(int i) {
+    /* Source and destination address selected randomly from range of 8MB. */
+    memcpy_func(buffer_page +
+        8192 * random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] +
+        ((i / (RANDOM_BUFFER_SIZE / 4)) & 15) * 256 +
+        (random_buffer_1024[(i * 4) & (RANDOM_BUFFER_SIZE - 1)] & (~3)),
+        buffer_page +
+        8192 * random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] +
+        ((i / (RANDOM_BUFFER_SIZE / 4)) & 15) * 256 +
+        (random_buffer_1024[(i * 4 + 1) & (RANDOM_BUFFER_SIZE - 1)] & (~3)),
+        4 + (random_buffer_1024[((i * 4 + 2) & (RANDOM_BUFFER_SIZE - 1))] & 60));
+}
+
 static void clear_data_cache() {
     int val = 0;
     for (int i = 0; i < 1024 * 1024 * 32; i += 4) {
@@ -380,7 +426,7 @@ static void do_test_all(const char *name, void (*test_func)(), int bytes) {
         }
 }
 
-#define NU_TESTS 34
+#define NU_TESTS 37
 
 typedef struct {
     const char *name;
@@ -412,6 +458,12 @@ test_t test[NU_TESTS] = {
        512 },
     { "Up to 64 bytes randomly aligned (DRAM)", test_random_mixed_sizes_DRAM_64,
        32 },
+    { "Up to 1024 bytes word aligned (DRAM)", test_random_mixed_sizes_DRAM_word_aligned_1024,
+       514 },
+    { "Up to 256 bytes word aligned (DRAM)", test_random_mixed_sizes_DRAM_word_aligned_256,
+       130 },
+    { "Up to 64 bytes word aligned (DRAM)", test_random_mixed_sizes_DRAM_word_aligned_64,
+       34 },
     { "30 bytes 4-byte aligned", test_word_aligned_30, 30 },
     { "64 bytes 4-byte aligned", test_word_aligned_64, 64 },
     { "296 bytes 4-byte aligned", test_word_aligned_296, 296 },
