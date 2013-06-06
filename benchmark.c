@@ -255,31 +255,31 @@ static void test_chunk_aligned_32768(int i) {
 
 static void test_page_aligned_1024(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
-        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8192 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
         1024);
 }
 
 static void test_page_aligned_4096(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
-        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8192 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
         4096);
 }
 
 static void test_page_aligned_32768(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
-        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8192 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
         32768);
 }
 
 static void test_page_aligned_256K(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
-        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8192 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
         256 * 1024);
 }
 
 static void test_page_aligned_1M(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
-        buffer_page + 8129 * 1024 + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
+        buffer_page + 8192 * 1024 + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4096,
         1024 * 1024);
 }
 
