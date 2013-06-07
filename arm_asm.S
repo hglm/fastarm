@@ -649,8 +649,8 @@ asm_function memcpy_armv5te
     stmia   r0!, {r3-r4}
     stmia   r0!, {r5-r6}
     pld     [r1, r9]
-    stmia   r0, {r7-r8}
-    stmia   r0, {r10-r11}
+    stmia   r0!, {r7-r8}
+    stmia   r0!, {r10-r11}
 .endif
     bge     1b
 .endif /* line_size ==  64 */
