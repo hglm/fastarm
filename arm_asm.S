@@ -437,7 +437,7 @@ asm_function memcpy_armv5te
  * block_write_size must be 32, 16 or 8.
  * preload_offset must be a multiple of 32, 96 was the default setting. When preload_offset is 0,
  * no preload instructions will be generated at all.
- * preload_early must be 0 or 1. 1 is only allowed if write_align is 32.
+ * preload_early must be 0 or 1.
  *
  * If line_size is 64, write_align must be 64, block_write_size must be 32, and preload_offset
  * must be a multiple of 64.
@@ -830,6 +830,10 @@ asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16
     MEMCPY_NO_OVERFETCH 32, 16, 16, 96, 0
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_early_96
+    MEMCPY_NO_OVERFETCH 32, 16, 16, 96, 1
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_8
