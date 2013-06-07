@@ -582,6 +582,8 @@ int main(int argc, char *argv[]) {
     int validate = 0;
     for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
         memcpy_mask[i] = 1;
+    // Disable fastarm memcpy because it is buggy.
+    memcpy_mask[1] = 0;
     for (;;) {
         if (argi >= argc)
             break;

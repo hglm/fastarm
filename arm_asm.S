@@ -564,10 +564,49 @@ asm_function memcpy_armv5te
     pld     [r4, #(\line_size * 3)]
 .if \write_align == 32 && \block_write_size == 16 && \preload_offset >= 96
     cmp     r2, #(\preload_offset + 128)
+    add     ip, r4, #(\line_size * 4)
     blt     1f
     /* When early preload is enabled, gradually catch up to the preload offset */
     /* in the main loop while processing 128 bytes at a time. */
-    add     ip, r4, #128
+    sub     r4, ip, r1
+    add     r4, r4, #128
+    cmp     r2, r4
+    /* Jump if the next 5 preloads would overfetch. */
+    ble     11f
+16:
+    sub     r2, r2, #128
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    pld     [ip]
+    stmia   r0!, {r3-r6}
+    sub     r4, ip, r1
+    stmia   r0!, {r7, r8, r10, r11}
+    add     r4, r4, #(128 + 128 + 32)
+    pld     [ip, #32]
+    cmp     r2, r4
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    stmia   r0!, {r3-r6}
+    pld     [ip, #64]
+    stmia   r0!, {r7, r8, r10, r11}
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    pld     [ip, #96]
+    stmia   r0!, {r3-r6}
+    stmia   r0!, {r7, r8, r10, r11}
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    pld     [ip, #128]
+    add     ip, #160
+    stmia   r0!, {r3-r6}
+    sub     r4, ip, r1
+    stmiale r0!, {r7, r8, r10, r11}
+    /* Jump if the next 5 preloads would overfetch. */
+    ble     17f
+    /* Has the offset catched up yet? */
+    cmp     r4, r9
+    stmia   r0!, {r7, r8, r10, r11}
+    blt     16b
+    b       13f
+17:
+    cmp     r2, #(\preload_offset + 128)
+    blt     13f
 11:
     sub     r2, r2, #32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
@@ -577,23 +616,23 @@ asm_function memcpy_armv5te
     add     r4, r4, #32
     cmp     r2, r4
     stmia   r0!, {r7, r8, r10, r11}
-    /* Jump if the next preload would overfetch, */
-    blt     13f
+    /* Jump if the next preload would overfetch. */
+    ble     13f
     sub     r2, r2, #32
     pld     [ip, #32]
     cmp     r2, r4
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     stmia   r0!, {r3-r6}
-    stmialt r0!, {r7, r8, r10, r11}
-    /* Jump if the next preload would overfetch, */
-    blt     13f
+    stmiale r0!, {r7, r8, r10, r11}
+    /* Jump if the next preload would overfetch. */
+    ble     13f
     sub     r4, ip, r1
     add     r4, r4, #96
     cmp     r2, r4
     pld     [ip, #64]
     stmia   r0!, {r7, r8, r10, r11}
-    /* Jump if the next preload would overfetch, */
-    blt     13f
+    /* Jump if the next preload would overfetch. */
+    ble     13f
     sub     r2, r2, #32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     pld     [ip, #96]
@@ -602,18 +641,15 @@ asm_function memcpy_armv5te
     add     r4, r4, #128
     stmia   r0!, {r7, r8, r10, r11}
     cmp     r2, r4
-    /* Jump if the next preload would overfetch, */
-    blt     13f
+    /* Jump if the next preload would overfetch. */
+    ble     13f
     sub     r2, r2, #32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     pld     [ip, #128]
     add     ip, #160
     stmia   r0!, {r3-r6}
     sub     r4, ip, r1
-    /* Has the offset catched up yet? */
-    cmp     r4, r9
     stmia   r0!, {r7, r8, r10, r11}
-    blt     11b
 13:
     cmp     r2, #(\preload_offset + 32)
     blt     12f
