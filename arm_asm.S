@@ -476,12 +476,9 @@ asm_function memcpy_armv5te
     orrne   r3, r3, r5, asl #8
 .if \preload_early == 1
     /* Determine the address of the last byte. */
-    add     r6, r0, r2
+    add     r6, r1, r2
 .endif
     strhne  r3, [r0], #2
-.if \preload_early == 1
-    addne   r6, r6, #2
-.endif
     /* destination address is 4 bytes aligned */
     /* now we should handle 4 cases of source address alignment */
     tst     r1, #1
@@ -490,7 +487,7 @@ asm_function memcpy_armv5te
 .endif
     bne     6f
 .if \preload_early == 1
-    bic     r6, r6, #\line_size
+    bic     r6, r6, #(\line_size - 1)
 .endif
     tst     r1, #2
 .if \preload_early == 1
@@ -562,6 +559,7 @@ asm_function memcpy_armv5te
 .if \preload_offset != 0
 .if \preload_early == 1
     pld     [r4, #(\line_size * 3)]
+#if 0
 .if \write_align == 32 && \block_write_size == 16 && \preload_offset >= 96
     cmp     r2, #(\preload_offset + 128)
     add     ip, r4, #(\line_size * 4)
@@ -654,6 +652,7 @@ asm_function memcpy_armv5te
     cmp     r2, #(\preload_offset + 32)
     blt     12f
 .endif
+#endif
 .endif
 1:
 .if \line_size == 64
