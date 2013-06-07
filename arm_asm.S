@@ -474,16 +474,41 @@ asm_function memcpy_armv5te
     ldrbne  r5, [r1], #1
     subne   r2, r2, #2
     orrne   r3, r3, r5, asl #8
+.if \preload_early == 1
+    /* Determine the address of the last byte. */
+    add     r6, r0, r2
+.endif
     strhne  r3, [r0], #2
+.if \preload_early == 1
+    addne   r6, r6, #2
+.endif
     /* destination address is 4 bytes aligned */
     /* now we should handle 4 cases of source address alignment */
     tst     r1, #1
+.if \preload_early == 1
+    sub     r6, r6, #1
+.endif
     bne     6f
+.if \preload_early == 1
+    bic     r6, r6, #\line_size
+.endif
     tst     r1, #2
+.if \preload_early == 1
+    add     r5, r4, #(\line_size * 2)
+.endif
     bne     7f
 
     /* both source and destination are 4 bytes aligned */
+.if \preload_early == 1
+    cmp     r6, r5
+.endif
     stmfd   sp!, {r7, r8, r9, r10, r11}
+.if \preload_early == 1
+    /* Only preload if the source region extends into it. */
+    blt     15f
+    pld     [r5]
+15:
+.endif
     tst     r0, #4
     ldrne   r5, [r1], #4
     subne   r2, r2, #4
@@ -536,13 +561,13 @@ asm_function memcpy_armv5te
 .endif
 .if \preload_offset != 0
 .if \preload_early == 1
-    pld     [r4, #(\line_size * 2)]
-.if \write_align == 32 && \block_write_size == 16 && \preload_offset >= 128
+    pld     [r4, #(\line_size * 3)]
+.if \write_align == 32 && \block_write_size == 16 && \preload_offset >= 96
     cmp     r2, #(\preload_offset + 128)
     blt     1f
     /* When early preload is enabled, gradually catch up to the preload offset */
     /* in the main loop while processing 128 bytes at a time. */
-    add     ip, r4, #96
+    add     ip, r4, #128
 11:
     sub     r2, r2, #32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
@@ -559,8 +584,8 @@ asm_function memcpy_armv5te
     cmp     r2, r4
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     stmia   r0!, {r3-r6}
-    /* Jump if the next preload would overfetch, */
     stmialt r0!, {r7, r8, r10, r11}
+    /* Jump if the next preload would overfetch, */
     blt     13f
     sub     r4, ip, r1
     add     r4, r4, #96
