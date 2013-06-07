@@ -451,9 +451,14 @@ static int compare_buffers(uint8_t *buffer0, uint8_t *buffer1) {
     return 1;
 }
 
-static void do_validation() {
+static void memcpy_emulate(uint8_t *dest, uint8_t *src, int size) {
+    for (int i = 0; i < size; i++)
+        dest[i] = src[i];
+}
+
+static void do_validation(int repeat) {
     int passed = 1;
-    for (int i = 0; i < 50; i++)  {
+    for (int i = 0; i < 10 * repeat; i++)  {
         int size = floor(pow(2.0, (double)rand() * 20.0 / RAND_MAX));
         int source = rand() % (1024 * 1024 * 16 + 1 - size);
         int dest;
@@ -462,7 +467,7 @@ static void do_validation() {
         }
         while (dest + size > source && dest < source + size);
         fill_buffer(buffer_compare);
-        memcpy(buffer_compare + dest, buffer_compare + source, size);
+        memcpy_emulate(buffer_compare + dest, buffer_compare + source, size);
         fill_buffer(buffer_alloc);
         memcpy_func(buffer_alloc + dest, buffer_alloc + source, size);
         if (!compare_buffers(buffer_alloc, buffer_compare)) {
@@ -546,7 +551,8 @@ static void usage() {
                 "--memcpy <list> Instead of testing all memcpy variants, test only the memcpy variants\n"
                 "                in <list>. <list> is a string of characters from a to h or higher, corresponding\n"
                 "                to each memcpy variant (for example, abcdef selects the first six variants).\n"
-                "--validate      Validate for correctness instead of measuring performance.\n"
+                "--validate      Validate for correctness instead of measuring performance. The --repeat option\n"
+                "                can be used to influence the number of validation tests performed (default 5).\n"
                 );
 }
 
@@ -683,7 +689,7 @@ int main(int argc, char *argv[]) {
             if (memcpy_mask[j]) {
                 printf("%s:\n", memcpy_variant_name[j]);
                 memcpy_func = memcpy_variant[j];
-                do_validation();
+                do_validation(repeat);
             }
         return 0;
     }
