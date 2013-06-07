@@ -26,8 +26,7 @@
  * 2. Add non-overfetching memcpy version. Various optimizations for this version
  *    are documented in the git log. The function is split into several variants
  *    using macros.
- *    To do: -- Implement write-align == 32 for unaligned case.
- *           -- Implement line_size == 64 and write_align == 64 for unaligned case.
+ *    To do: -- Implement line_size == 64 and write_align == 64 for unaligned case.
  */
 
 /* Prevent the stack from becoming executable */
@@ -262,11 +261,31 @@ asm_function memcpy_armv5te
 
 /*
  * Helper macro for non-overfetching version.
+ *
+ * r6 is the address of the 32-byte aligned region containing the last source byte.
+ * r4 is the address of the 32-byte aligned region containing the first source byte.
+ * If preload_early is 1, preloads have already occurred at [r4] and [r4 + line_size].
  */
 
-.macro  UNALIGNED_MEMCPY_NO_OVERFETCH shift, write_align, block_write_size, preload_offset
+.macro  UNALIGNED_MEMCPY_NO_OVERFETCH shift, line_size, write_align, block_write_size, preload_offset, preload_early
     sub     r1, #(\shift)
+.if \preload_early == 1
+    add     r5, r4, #(\line_size * 2)
+.endif
     ldr     ip, [r1], #4
+.if \preload_early == 1
+    cmp     r6, r5
+    /* Only preload if the source region extends into it. */
+    blt     5f
+    pld     [r5]
+5:
+.if \write_align == 32
+    /* Need a place to store r4. */
+    push    {r4}
+.else
+    mov     r5, r4
+.endif
+.endif
 
     tst     r0, #4
     movne   r3, ip, lsr #(\shift * 8)
@@ -283,7 +302,26 @@ asm_function memcpy_armv5te
     movne   r4, r4, lsr #(\shift * 8)
     orrne   r4, r4, ip, asl #(32 - \shift * 8)
     stmiane r0!, {r3-r4}
+
+.if \write_align == 32
+    tst     r0, #16
+    movne   r3, ip, lsr #(\shift * 8)
+    ldmiane r1!, {r4-r6, ip}
+    subne    r2, r2, #16
+    orrne   r3, r3, r4, asl #(32 - \shift * 8)
+    movne   r4, r4, lsr #(\shift * 8)
+    orrne   r4, r4, r5, asl #(32 - \shift * 8)
+    movne   r5, r5, lsr #(\shift * 8)
+    orrne   r5, r5, r6, asl #(32 - \shift * 8)
+    movne   r6, r6, lsr #(\shift * 8)
+    orrne   r6, r6, ip, asl #(32 - \shift * 8)
+    stmiane r0!, {r3-r6}
+.endif
+
     cmp     r2, #32
+.if \preload_early == 1 && \write_align == 32
+    pop     {r5}
+.endif
     blt     3f
 .if \preload_offset != 0
     cmp     r2, #\preload_offset
@@ -295,6 +333,9 @@ asm_function memcpy_armv5te
     sub     r9, r3, r1
     /* If there are less than preload_offset bytes to go, skip the main loop. */
     blt     4f
+.if \preload_early == 1 && \preload_offset >= 64
+    pld     [r5, #(\line_size * 3)]
+.endif
 1:
     cmp     r2, #(\preload_offset + 32)
     pld     [r1, r9]
@@ -715,11 +756,11 @@ asm_function memcpy_armv5te
 6:
     tst    r1, #2
     bne    8f
-    UNALIGNED_MEMCPY_NO_OVERFETCH 1, \write_align, \block_write_size, \preload_offset
+    UNALIGNED_MEMCPY_NO_OVERFETCH 1, \line_size, \write_align, \block_write_size, \preload_offset, \preload_early
 7:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 2, \write_align, \block_write_size, \preload_offset
+    UNALIGNED_MEMCPY_NO_OVERFETCH 2, \line_size, \write_align, \block_write_size, \preload_offset, \preload_early
 8:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 3, \write_align, \block_write_size, \preload_offset
+    UNALIGNED_MEMCPY_NO_OVERFETCH 3, \line_size, \write_align, \block_write_size, \preload_offset, \preload_early
 9:
     /*
      * Size < 36.
