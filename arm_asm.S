@@ -613,7 +613,7 @@ asm_function memcpy_armv5te
     /* Has the offset catched up yet? */
     cmp     r4, r9
     stmia   r0!, {r7, r8, r10, r11}
-    bgt     11b
+    blt     11b
 13:
     cmp     r2, #(\preload_offset + 32)
     blt     12f
