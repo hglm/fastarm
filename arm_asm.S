@@ -296,13 +296,13 @@ asm_function memcpy_armv5te
     /* If there are less than preload_offset bytes to go, skip the main loop. */
     blt     4f
 1:
+    cmp     r2, #(\preload_offset + 32)
     pld     [r1, r9]
-    sub     r2, r2, #32
     mov     r3, ip, lsr #(\shift * 8)
     ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
     orr     r3, r3, r4, asl #(32 - \shift * 8)
     mov     r4, r4, lsr #(\shift * 8)
-    cmp     r2, #\preload_offset
+    sub     r2, r2, #32
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
 .if \block_write_size == 8
@@ -340,12 +340,12 @@ asm_function memcpy_armv5te
     bge     1b
 .endif /* preload_offset != 0 */
 4:
-    sub     r2, r2, #32
+    cmp     r2, #(32 + 32)
     mov     r3, ip, lsr #(\shift * 8)
     ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
     orr     r3, r3, r4, asl #(32 - \shift * 8)
+    sub     r2, r2, #32
     mov     r4, r4, lsr #(\shift * 8)
-    cmp     r2, #32
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
 .if \block_write_size == 8
@@ -447,7 +447,7 @@ asm_function memcpy_armv5te
 .if \preload_early == 1
     bic     r3, r1, #(\line_size - 1)
 .endif
-.if \write_align == 32
+.if \write_align >= 32
     cmp     r2, #36
 .else
     cmp     r2, #20
@@ -455,12 +455,12 @@ asm_function memcpy_armv5te
 .if \preload_early == 1
     pld     [r3]
 .endif
-    blt     9f
     /* copy data until destination address is 4 bytes aligned */
-    stmfd   sp!, {r0, r4}
+    stmfdge sp!, {r0, r4}
 .if \preload_early == 1
-    mov     r4, r3
+    movge   r4, r3
 .endif
+    blt     9f
     tst     r0, #1
     ldrbne  r3, [r1], #1
     subne   r2, r2, #1
@@ -485,10 +485,10 @@ asm_function memcpy_armv5te
 .if \preload_early == 1
     sub     r6, r6, #1
 .endif
-    bne     6f
 .if \preload_early == 1
     bic     r6, r6, #(\line_size - 1)
 .endif
+    bne     6f
     tst     r1, #2
 .if \preload_early == 1
     add     r5, r4, #(\line_size * 2)
@@ -546,8 +546,8 @@ asm_function memcpy_armv5te
     cmp     r2, #(\preload_offset + 32)
     ble     10f
 .else
-    add     r9, r1, #\preload_offset
     cmp     r2, #32
+    add     r9, r1, #\preload_offset
     bic     r9, r9, #31
     /* If there are less than 32 bytes to go, skip all loops. */
     blt     2f
@@ -563,67 +563,80 @@ asm_function memcpy_armv5te
 .if \preload_early == 1
     add     ip, r4, #(\line_size * 3)
     pld     [r4, #(\line_size * 3)]
-.if \line_size == 32 && \block_write_size == 16 && \preload_offset >= 96
+.if \line_size == 32 && \block_write_size >= 16 && \preload_offset >= 96
     /* The last preload already done is at [ip]. */
     /* The next preload in the main loop will happen at [r11 + line_size]. */
     /* If ip < r11, we want to do an extra preload at [ip + line_size]. */
     cmp     ip, r11
-    ldmia   r1, {r3-r6}
     add     ip, #64
+    ldmialt r1!, {r3-r6, r7, r8, r10, r11}
     bge     1f
-    add     r1, #16
-    sub     r2, r2, #32
+    cmp     r2, #(\preload_offset + 32 + 32)
     pld     [ip, #-32]
-    ldmia   r1!, {r7, r8, r10, r11}
-    cmp     r2, #(\preload_offset + 32)
+    sub     r2, r2, #32
+.if \block_write_size == 32
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+    add     r4, r1, r9
+.else
     stmia   r0!, {r3-r6}
-    pld     [ip]
     add     r4, r1, r9
     stmia   r0!, {r7, r8, r10, r11}
-    ble     10f
-    /* Do another extra preload if required. */
-    cmp     ip, r4
-    ldmia   r1, {r3-r6}
-    add     ip, #64
-    bge     1f
-    add     r1, #16
-    sub     r2, r2, #32
-    pld     [ip, #-32]
-    ldmia   r1!, {r7, r8, r10, r11}
-    cmp     r2, #(\preload_offset + 32)
-    stmia   r0!, {r3-r6}
+.endif
     pld     [ip]
-    stmia   r0!, {r7, r8, r10, r11}
     ble     10f
+#if 1
+    /* Do other extra preloads if required. */
+13:
+    cmp     ip, r4
+    add     ip, #64
+    ldmialt r1!, {r3-r6, r7, r8, r10, r11}
+    bge     1f
+    cmp     r2, #(\preload_offset + 32 + 32)
+    pld     [ip, #-32]
+    sub     r2, r2, #32
+.if \block_write_size == 32
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+    add     r4, r1, r9
+.else
+    stmia   r0!, {r3-r6}
+    add     r4, r1, r9
+    stmia   r0!, {r7, r8, r10, r11}
+.endif
+    pld     [ip]
+    ble     10f
+    b       13b
+#endif
 .endif
 .endif
 1:
 .if \line_size == 64
-    sub     r2, r2, #64
+    cmp     r2, #(\preload_offset + 64 + 64)
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #(\preload_offset + 64)
+    sub     r2, r2, #64
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     pld     [r1, r9]
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
 .else
-    sub     r2, r2, #32
 .if \block_write_size == 32
+    cmp     r2, #(\preload_offset + 32 + 32)
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #(\preload_offset + 32)
+    sub     r2, r2, #32
     pld     [r1, r9]
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
 .endif
 .if \block_write_size == 16
+    cmp     r2, #(\preload_offset + 32 + 32)
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #(\preload_offset + 32)
+    sub     r2, r2, #32
     pld     [r1, r9]
     stmia   r0!, {r3-r6}
     stmia   r0!, {r7, r8, r10, r11}
 .endif
 .if \block_write_size == 8
+    cmp     r2, #(\preload_offset + 32 + 32)
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #(\preload_offset + 32)
+    sub     r2, r2, #32
     stmia   r0!, {r3-r4}
     stmia   r0!, {r5-r6}
     pld     [r1, r9]
@@ -635,28 +648,30 @@ asm_function memcpy_armv5te
 .endif /* preload != 0 */
 10:
 .if \line_size == 64
-    sub     r2, r2, #64
+    cmp     r2, #(64 + 64)
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #64
+    sub     r2, r2, #64
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
 .else
-    sub     r2, r2, #32
 .if \block_write_size == 32
+    cmp     r2, #(32 + 32)
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #32
+    sub     r2, r2, #32
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
 .endif
 .if \block_write_size == 16
+    cmp     r2, #(32 + 32)
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #32
+    sub     r2, r2, #32
     stmia   r0!, {r3-r6}
     stmia   r0!, {r7, r8, r10, r11}
 .endif
 .if \block_write_size == 8
+    cmp     r2, #(32 + 32)
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
-    cmp     r2, #32
+    sub     r2, r2, #32
     stmia   r0!, {r3-r4}
     stmia   r0!, {r5-r6}
     stmia   r0!, {r7-r8}
