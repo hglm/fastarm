@@ -37,7 +37,7 @@
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
-#define NU_MEMCPY_VARIANTS 31
+#define NU_MEMCPY_VARIANTS 32
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
