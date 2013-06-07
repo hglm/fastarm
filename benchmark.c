@@ -30,6 +30,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <sys/time.h>
+#include <math.h>
 
 #include "fastarm.h"
 #include "arm_asm.h"
@@ -41,7 +42,7 @@
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
 memcpy_func_type memcpy_func;
-uint8_t *buffer_alloc, *buffer_chunk, *buffer_page;
+uint8_t *buffer_alloc, *buffer_chunk, *buffer_page, *buffer_compare;
 int *random_buffer_1024;
 double test_duration = DEFAULT_TEST_DURATION;
 int memcpy_mask[NU_MEMCPY_VARIANTS];
@@ -436,6 +437,45 @@ static void do_test_all(const char *name, void (*test_func)(), int bytes) {
         }
 }
 
+static void fill_buffer(uint8_t *buffer) {
+    for (int i = 0; i < 1024 * 1024 * 16; i++) {
+        buffer[i] = i & 0xFF;
+    }
+}
+
+static int compare_buffers(uint8_t *buffer0, uint8_t *buffer1) {
+    for (int i = 0; i < 1024 * 1024 * 16; i++) {
+        if (buffer0[i] != buffer1[i])
+            return 0;
+    }
+    return 1;
+}
+
+static void do_validation() {
+    int passed = 1;
+    for (int i = 0; i < 50; i++)  {
+        int size = floor(pow(2.0, (double)rand() * 20.0 / RAND_MAX));
+        int source = rand() % (1024 * 1024 * 16 + 1 - size);
+        int dest;
+        do {
+            dest = rand() % (1024 * 1024 * 16 + 1 - size);
+        }
+        while (dest + size > source && dest < source + size);
+        fill_buffer(buffer_compare);
+        memcpy(buffer_compare + dest, buffer_compare + source, size);
+        fill_buffer(buffer_alloc);
+        memcpy_func(buffer_alloc + dest, buffer_alloc + source, size);
+        if (!compare_buffers(buffer_alloc, buffer_compare)) {
+            printf("Validation failed (source offset = %d, destination offset = %d, size = %d.\n",
+                source, dest, size);
+            passed = 0;
+        }
+    }
+    if (passed) {
+        printf("Passed.\n");
+    }
+}
+
 #define NU_TESTS 37
 
 typedef struct {
@@ -497,15 +537,16 @@ static void usage() {
             printf("Commands:\n"
                 "--list          List test numbers and memcpy variants.\n"
                 "--test <number> Perform test <number> only, 5 times for each memcpy variant.\n"
-                "--quick         Shorthand for --duration 1 -repeat 2.\n"
                 "--all           Perform each test 5 times for each memcpy variant.\n"
                 "--help          Show this message.\n"
                 "Options:\n"
                 "--duration <n>  Sets the duration of each individual test. Default is 2 seconds.\n"
                 "--repeat <n>    Repeat each test n times. Default is 5.\n"
+                "--quick         Shorthand for --duration 1 -repeat 2.\n"
                 "--memcpy <list> Instead of testing all memcpy variants, test only the memcpy variants\n"
                 "                in <list>. <list> is a string of characters from a to h or higher, corresponding\n"
                 "                to each memcpy variant (for example, abcdef selects the first six variants).\n"
+                "--validate      Validate for correctness instead of measuring performance.\n"
                 );
 }
 
@@ -530,9 +571,9 @@ int main(int argc, char *argv[]) {
     }
     int argi = 1;
     int command_test = - 1;
-    int command_quick = 0;
     int command_all = 0;
     int repeat = 5;
+    int validate = 0;
     for (int i = 0; i < NU_MEMCPY_VARIANTS; i++)
         memcpy_mask[i] = 1;
     for (;;) {
@@ -600,11 +641,16 @@ int main(int argc, char *argv[]) {
             argi += 2;
             continue;
         }
+        if (strcasecmp(argv[argi], "--validate") == 0) {
+            validate = 1;
+            argi++;
+            continue;
+        }
         printf("Unkown option. Try --help.\n");
         return 1;
     }
 
-    if ((command_test != -1) + command_all != 1) {
+    if ((command_test != -1) + command_all != 1 && !validate) {
         printf("Specify only one of --test and --all.\n");
         return 1;
     }
@@ -613,6 +659,8 @@ int main(int argc, char *argv[]) {
     buffer_page = (uint8_t *)buffer_alloc + ((4096 - ((uintptr_t)buffer_alloc & 4095))
         & 4095);
     buffer_chunk = buffer_page + 17 * 32;
+    if (validate)
+        buffer_compare = malloc(1024 * 1024 * 16);
     srand(0);
     random_buffer_1024 = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
     for (int i = 0; i < RANDOM_BUFFER_SIZE; i++)
@@ -623,18 +671,21 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (command_quick) {
-        for (int i = 0; i < NU_TESTS; i++)
-           do_test_all(test[i].name, test[i].test_func, test[i].bytes);
-        return 0;
-    }
-
     int start_test, end_test;
     start_test = 0;
     end_test = NU_TESTS - 1;
     if (command_test != - 1) {
         start_test = command_test;
         end_test = command_test;
+    }
+    if (validate) {
+        for (int j = 0; j < NU_MEMCPY_VARIANTS; j++)
+            if (memcpy_mask[j]) {
+                printf("%s:\n", memcpy_variant_name[j]);
+                memcpy_func = memcpy_variant[j];
+                do_validation();
+            }
+        return 0;
     }
     for (int t = start_test; t <= end_test; t++) {
         for (int j = 0; j < NU_MEMCPY_VARIANTS; j++)

@@ -9,10 +9,10 @@ libfastarm.a : fastarm.o
 	ar r libfastarm.a fastarm.o
 
 benchmark : benchmark.o arm_asm.o libfastarm.a fastarm.h arm_asm.h
-	gcc $(CFLAGS) benchmark.o arm_asm.o -o benchmark libfastarm.a -lrt
+	gcc $(CFLAGS) benchmark.o arm_asm.o -o benchmark libfastarm.a -lm -lrt
 
 benchmarkp : benchmark.c arm_asm.S fastarm.h fastarm.c
-	gcc $(PCFLAGS) benchmark.c arm_asm.S fastarm.c -o benchmarkp -lc -lrt
+	gcc $(PCFLAGS) benchmark.c arm_asm.S fastarm.c -o benchmarkp -lc -lm -lrt
 
 install : libfastarm.a fastarm.h
 	install -m 0644 fastarm.h /usr/include
