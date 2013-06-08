@@ -471,7 +471,7 @@ asm_function memcpy_armv5te
     stmia   r0!, {r10-r11}
 .endif
     bge     4b
-2:
+21:
     ldmfd   sp!, {r7, r8, r9, r10, r11}
 3:  /* copy remaining data */
     tst     r2, #16
@@ -537,12 +537,7 @@ asm_function memcpy_armv5te
 .if \preload_early == 1
     bic     r3, r1, #(\line_size - 1)
 .endif
-.if \preload_early == 1
-    /* The standard code path for early preload will preload up to [r3 + line_size * 4]. */
-    /* To avoid preloads beyond the source region for medium sizes, there is a seperate */
-    /* path for them when early preload is enabled. */
-    cmp     r2, #(\line_size * 5)
-.elseif \write_align >= 32
+.if \write_align >= 32
     cmp     r2, #36
 .else
     cmp     r2, #20
@@ -553,19 +548,24 @@ asm_function memcpy_armv5te
     stmfdge sp!, {r0, r4}
 .if \preload_early == 1
     movge   r4, r3
-    blt     17f
-.else
-    blt     9f
 .endif
+    blt     9f
     /* copy data until destination address is 4 bytes aligned */
     tst     r0, #1
     ldrbne  r3, [r1], #1
     subne   r2, r2, #1
     strbne  r3, [r0], #1
 .if \preload_early == 1
+    /* The standard code path for early preload will preload up to [r3 + line_size * 4]. */
+    /* To avoid preloads beyond the source region for medium sizes, there is a seperate */
+    /* path for them when early preload is enabled. */
+    cmp     r2, #(\line_size * 5)
     pld     [r4, #\line_size]
 .endif
     stmfd   sp!, {r5, r6}
+.if \preload_early == 1
+    blt     17f
+.endif
     tst     r0, #2
     ldrbne  r3, [r1], #1
     ldrbne  r5, [r1], #1
@@ -621,7 +621,7 @@ asm_function memcpy_armv5te
     stmiane r0!, {r3, r5-r11}
 .endif
     /* Source is now write_align bytes aligned. */
-19:
+20:
 .if \preload_offset == 0
     cmp     r2, #32
     blt     2f
@@ -652,6 +652,7 @@ asm_function memcpy_armv5te
     /* If there are <= (preload_offset + 32) bytes to go, skip the main loop. */
     ble     10f
 .endif
+19:
 .if \preload_offset != 0
 .if \preload_early == 1
     mov     ip, r4
@@ -822,7 +823,7 @@ asm_function memcpy_armv5te
     tst    r0, #3
     andseq r3, r1, #3
     stmfd  sp!, {r0, r4}
-    beq    2f
+    beq    22f
     tst    r0, #1
     andseq r3, r1, #1
     beq    3f
@@ -846,12 +847,12 @@ asm_function memcpy_armv5te
     ldr    r4, [sp], #4
     strbgt r3, [ip], #1
     bx     lr
-2:
+22:
     /* Copy words. */
     subs   r2, r2, #4
     ldrge  r3, [r1], #4
     strge  r3, [r0], #4
-    bge    2b
+    bge    22b
     tst    r2, #2
     mov    ip, r0
     ldrhne r3, [r1], #2
@@ -875,22 +876,6 @@ asm_function memcpy_armv5te
     bx     lr
     /* Special code path for medium sizes when early preload is enabled. */
 17:
-.if \write_align >= 32
-    cmp     r2, #36
-.else
-    cmp     r2, #20
-.endif
-    stmfdge sp!, {r0, r4}
-    movge   r4, r3
-    blt     9b
-
-    /* copy data until destination address is 4 bytes aligned */
-    tst     r0, #1
-    ldrbne  r3, [r1], #1
-    subne   r2, r2, #1
-    strbne  r3, [r0], #1
-    pld     [r4, #\line_size]
-    stmfd   sp!, {r5, r6}
     tst     r0, #2
     ldrbne  r3, [r1], #1
     ldrbne  r5, [r1], #1
@@ -949,8 +934,54 @@ asm_function memcpy_armv5te
     subne   r2, r2, #32
     stmiane r0!, {r3, r5-r11}
 .endif
+
+    /* Optimize the branches based on the number of bytes left, */
+    /* since we know that number of bytes left < line_size * 5. */
+.if \write_align == 64
+    cmp     r2, #64
+    mov     r9, #\preload_offset
+    blt     2b
+.if (\line_size * 5) <= (\preload_offset + 64)
+    b       10b
+.else
+    cmp     r2, #(\preload_offset + 64)
+    ble     10b
     b       19b
-.endm
+.endif
+.elseif \write_align == 32
+    /* In the case of write_align == 32 r9 will be equal to preload_offset. */
+    cmp     r2, #32
+    mov     r9, #\preload_offset
+.if (\line_size * 5) <= (\preload_offset + 32) && 0
+    bge     10b
+    b       2b
+.else
+    blt     2b
+    cmp     r2, #(\preload_offset + 32)
+    ble     10b
+    b       19b
+.endif
+.else
+    cmp     r2, #32
+    add     r9, r1, #\preload_offset
+    bic     r9, r9, #31
+.if (\line_size * 5) <= (\preload_offset + 32)
+    mov     r11, r9
+    sub     r9, r9, r1
+    bge     10b
+    b       2b
+.else
+    /* If there are less than 32 bytes to go, skip all loops. */
+    blt     2b
+    cmp     r2, #(\preload_offset + 32)
+    mov     r11, r9
+    sub     r9, r9, r1
+    /* If there are <= (preload_offset + 32) bytes to go, skip the main loop. */
+    ble     10b
+    b       19b
+.endif
+.endif
+ .endm
 
 #ifdef RPI_BEST_MEMCPY_ONLY
 
