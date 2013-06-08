@@ -985,7 +985,7 @@ asm_function memcpy_armv5te
 
 #ifdef RPI_BEST_MEMCPY_ONLY
 
-asm_function armv5te_no_overfetch
+asm_function memcpy_armv5te_no_overfetch
     MEMCPY_NO_OVERFETCH 32, 16, 16, 128, 1
 .endfunc
 
