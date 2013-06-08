@@ -20,13 +20,23 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Modified by Harm Hanemaaijer <fgenfb@yahoo.com>:
+ * Copyright 2013 Harm Hanemaaijer <fgenfb@yahoo.com>
+ * 
  * 1. Add ".type <function_name>, function" to function definition macro, which
  *    was required for correct linkage on my platform.
- * 2. Add non-overfetching memcpy version. Various optimizations for this version
- *    are documented in the git log. The function is split into several variants
- *    using macros.
+ * 2. Add non-overfetching memcpy version with a plethora of optimizations and variants using
+ *    macros.
  *    To do: -- Implement line_size == 64 and write_align == 64 for unaligned case.
+ *
+ * On the RPi platform, a good choice is armv5te_no_overfetch_align_16_block_write_16_preload_early_128,
+ * closely followed by armv5te_no_overfetch_align_16_block_write_16_preload_early_96. For
+ * CPU-cache based work loads armv5te_no_overfetch_align_16_block_write_16_preload_96 might be
+ * a little faster.
+ *
+ * On the Allwinner A10 platform, armv5te_no_overfetch_align_32_block_write_32_preload_early_192
+ * is a good choice.
+ *
+ * Both are faster than the system default memcpy, although RPi's libcofi does relatively well.
  */
 
 /* Prevent the stack from becoming executable */
@@ -262,15 +272,15 @@ asm_function memcpy_armv5te
 /*
  * Helper macro for non-overfetching version.
  *
+ * If preload_early == 1,
  * r6 is the address of the 32-byte aligned region containing the last source byte.
- * r4 is the address of the 32-byte aligned region containing the first source byte.
- * If preload_early is 1, preloads have already occurred at [r4] and [r4 + line_size].
+ * r4 is the address of the 32-byte aligned region where the last preload occured
  */
 
 .macro  UNALIGNED_MEMCPY_NO_OVERFETCH shift, line_size, write_align, block_write_size, preload_offset, preload_early
     sub     r1, #(\shift)
 .if \preload_early == 1
-    add     r5, r4, #(\line_size * 2)
+    add     r5, r4, #\line_size
 .endif
     ldr     ip, [r1], #4
 .if \preload_early == 1
@@ -280,10 +290,8 @@ asm_function memcpy_armv5te
     pld     [r5]
 5:
 .if \write_align == 32
-    /* Need a place to store r4. */
-    push    {r4}
-.else
-    mov     r5, r4
+    /* Need a place to store r5. */
+    push    {r5}
 .endif
 .endif
 
@@ -307,7 +315,7 @@ asm_function memcpy_armv5te
     tst     r0, #16
     movne   r3, ip, lsr #(\shift * 8)
     ldmiane r1!, {r4-r6, ip}
-    subne    r2, r2, #16
+    subne   r2, r2, #16
     orrne   r3, r3, r4, asl #(32 - \shift * 8)
     movne   r4, r4, lsr #(\shift * 8)
     orrne   r4, r4, r5, asl #(32 - \shift * 8)
@@ -328,13 +336,54 @@ asm_function memcpy_armv5te
 .endif
     stmfd   sp!, {r7, r8, r9, r10, r11}
 .if \preload_offset != 0
-    add     r3, r1, #\preload_offset
-    bic     r3, r3, #31
-    sub     r9, r3, r1
-    /* If there are less than preload_offset bytes to go, skip the main loop. */
-    blt     4f
+    add     r10, r1, #\preload_offset
 .if \preload_early == 1 && \preload_offset >= 64
-    pld     [r5, #(\line_size * 3)]
+    add     r5, r5, #(\line_size * 2)
+.endif
+    bic     r10, r10, #31
+    sub     r9, r10, r1
+    /* If there are <= preload_offset bytes to go, skip the main loop. */
+    ble     4f
+.if \line_size == 32 && \preload_early == 1 && \preload_offset >= 64 && block_write_size >= 16
+    mov     r11, r5
+    pld     [r5, #-\line_size]
+    /* The last preload already done is at [r11 - line_size]. */
+    /* The next preload in the main loop will happen at [r10]. */
+    /* If r11 < r10, we want to do an extra preload at [r11]. */
+#if 1
+18:
+    cmp     r11, r10
+    add     r11, #64
+    movlt   r3, ip, lsr #(\shift * 8)
+    ldmialt r1!, {r4-r6, r7}
+    orrlt   r3, r3, r4, asl #(32 - \shift * 8)
+    movlt   r4, r4, lsr #(\shift * 8)
+    bge     1f
+    cmp     r2, #(\preload_offset + 32)
+    pld     [r11, #-64]
+    sub     r2, r2, #32
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, r7, asl #(32 - \shift * 8)
+    mov     r7, r7, lsr #(\shift * 8)
+    stmia   r0!, {r3-r6}
+    mov     r3, r7
+    ldmia   r1!, {r4, r5, r6, ip}
+    pld     [r11, #-32]
+    orr     r3, r3, r4, asl #(32 - \shift * 8)
+    add     r10, r1, r9
+    mov     r4, r4, lsr #(\shift * 8)
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, ip, asl #(32 - \shift * 8)
+    stmia   r0!, {r3, r4, r5, r6}
+    bgt     18b
+    b       4f
+#endif
 .endif
 1:
     cmp     r2, #(\preload_offset + 32)
@@ -488,7 +537,12 @@ asm_function memcpy_armv5te
 .if \preload_early == 1
     bic     r3, r1, #(\line_size - 1)
 .endif
-.if \write_align >= 32
+.if \preload_early == 1
+    /* The standard code path for early preload will preload up to [r3 + line_size * 4]. */
+    /* To avoid preloads beyond the source region for medium sizes, there is a seperate */
+    /* path for them when early preload is enabled. */
+    cmp     r2, #(\line_size * 5)
+.elseif \write_align >= 32
     cmp     r2, #36
 .else
     cmp     r2, #20
@@ -496,12 +550,14 @@ asm_function memcpy_armv5te
 .if \preload_early == 1
     pld     [r3]
 .endif
-    /* copy data until destination address is 4 bytes aligned */
     stmfdge sp!, {r0, r4}
 .if \preload_early == 1
     movge   r4, r3
-.endif
+    blt     17f
+.else
     blt     9f
+.endif
+    /* copy data until destination address is 4 bytes aligned */
     tst     r0, #1
     ldrbne  r3, [r1], #1
     subne   r2, r2, #1
@@ -525,29 +581,20 @@ asm_function memcpy_armv5te
     tst     r1, #1
 .if \preload_early == 1
     sub     r6, r6, #1
-.endif
-.if \preload_early == 1
+    pld     [r4, #(\line_size * 2)]
+    add     r4, #(\line_size * 2)
     bic     r6, r6, #(\line_size - 1)
 .endif
     bne     6f
     tst     r1, #2
-.if \preload_early == 1
-    add     r5, r4, #(\line_size * 2)
-.endif
     bne     7f
 
     /* both source and destination are 4 bytes aligned */
-.if \preload_early == 1
-    cmp     r6, r5
-.endif
     stmfd   sp!, {r7, r8, r9, r10, r11}
-.if \preload_early == 1
-    /* Only preload if the source region extends into it. */
-    blt     15f
-    pld     [r5]
-15:
-.endif
     tst     r0, #4
+.if \preload_early == 1
+    pld     [r4, #(\line_size)]
+.endif
     ldrne   r5, [r1], #4
     subne   r2, r2, #4
     strne   r5, [r0], #4
@@ -561,6 +608,10 @@ asm_function memcpy_armv5te
     subne   r2, r2, #16
     stmiane r0!, {r3, r5-r7}
 .endif
+.if \preload_early == 1
+    pld     [r4, #(\line_size * 2)]
+    add     r4, #(\line_size * 3)
+.endif
 .if \write_align == 64
     cmp     r2, #32
     blt     14f
@@ -570,6 +621,7 @@ asm_function memcpy_armv5te
     stmiane r0!, {r3, r5-r11}
 .endif
     /* Source is now write_align bytes aligned. */
+19:
 .if \preload_offset == 0
     cmp     r2, #32
     blt     2f
@@ -602,8 +654,8 @@ asm_function memcpy_armv5te
 .endif
 .if \preload_offset != 0
 .if \preload_early == 1
-    add     ip, r4, #(\line_size * 3)
-    pld     [r4, #(\line_size * 3)]
+    mov     ip, r4
+    pld     [r4]
 .if \line_size == 32 && \block_write_size >= 16 && \preload_offset >= 96
     /* The last preload already done is at [ip]. */
     /* The next preload in the main loop will happen at [r11 + line_size]. */
@@ -644,8 +696,8 @@ asm_function memcpy_armv5te
     stmia   r0!, {r7, r8, r10, r11}
 .endif
     pld     [ip]
-    ble     10f
-    b       13b
+    bgt     13b
+    b       10f
 #endif
 .endif
 .endif
@@ -821,13 +873,98 @@ asm_function memcpy_armv5te
     ldmfd  sp!, {r0, r4}
     strbne r3, [ip], #1
     bx     lr
+    /* Special code path for medium sizes when early preload is enabled. */
+17:
+.if \write_align >= 32
+    cmp     r2, #36
+.else
+    cmp     r2, #20
+.endif
+    stmfdge sp!, {r0, r4}
+    movge   r4, r3
+    blt     9b
+
+    /* copy data until destination address is 4 bytes aligned */
+    tst     r0, #1
+    ldrbne  r3, [r1], #1
+    subne   r2, r2, #1
+    strbne  r3, [r0], #1
+    pld     [r4, #\line_size]
+    stmfd   sp!, {r5, r6}
+    tst     r0, #2
+    ldrbne  r3, [r1], #1
+    ldrbne  r5, [r1], #1
+    subne   r2, r2, #2
+    orrne   r3, r3, r5, asl #8
+    /* Determine the address of the last byte. */
+    add     r6, r1, r2
+    strhne  r3, [r0], #2
+
+    /* destination address is 4 bytes aligned */
+    /* now we should handle 4 cases of source address alignment */
+    tst     r1, #1
+    sub     r6, r6, #1
+    add     r4, r4, \line_size
+    bic     r6, r6, #(\line_size - 1)
+    bne     6b
+    tst     r1, #2
+    add     r5, r4, #\line_size
+    bne     7b
+
+    /* both source and destination are 4 bytes aligned */
+    cmp     r6, r5
+    stmfd   sp!, {r7, r8, r9, r10, r11}
+    mov     r8, r6
+    /* Only preload if the source region extends into it. */
+    movge   r4, r5
+    blt     15f
+    pld     [r5]
+    add     r4, r5, #\line_size
+15:
+    tst     r0, #4
+    ldrne   r5, [r1], #4
+    subne   r2, r2, #4
+    strne   r5, [r0], #4
+    tst     r0, #8
+    ldmiane r1!, {r3, r5}
+    subne   r2, r2, #8
+    stmiane r0!, {r3, r5}
+.if \write_align == 32 || \write_align == 64
+    tst     r0, #16
+    ldmiane r1!, {r3, r5-r7}
+    subne   r2, r2, #16
+    stmiane r0!, {r3, r5-r7}
+.endif
+    /* Only preload if the source region extends into it. */
+    cmp     r8, r4
+    blt     18f
+    pld     [r4]
+    add     r4, r4, #\line_size
+18:
+.if \write_align == 64
+    cmp     r2, #32
+    blt     14b
+    tst     r0, #32
+    ldmiane r1!, {r3, r5-r11}
+    subne   r2, r2, #32
+    stmiane r0!, {r3, r5-r11}
+.endif
+    b       19b
 .endm
 
-asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8
+#ifdef RPI_BEST_MEMCPY_ONLY
+
+asm_function armv5te_no_overfetch
+    MEMCPY_NO_OVERFETCH 32, 16, 16, 128, 1
+.endfunc
+
+#else
+
+asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8_preload_96
     MEMCPY_NO_OVERFETCH 32, 16, 8, 96, 0
 .endfunc
 
-asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16
+asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_96
     MEMCPY_NO_OVERFETCH 32, 16, 16, 96, 0
 .endfunc
 
@@ -839,7 +976,7 @@ asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_early_1
     MEMCPY_NO_OVERFETCH 32, 16, 16, 128, 1
 .endfunc
 
-asm_function memcpy_armv5te_no_overfetch_align_32_block_write_8
+asm_function memcpy_armv5te_no_overfetch_align_32_block_write_8_preload_96
     MEMCPY_NO_OVERFETCH 32, 32, 8, 96, 0
 .endfunc
 
@@ -938,5 +1075,7 @@ asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_192
 asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_256
     MEMCPY_NO_OVERFETCH 64, 64, 32, 256, 0
 .endfunc
+
+#endif
 
 #endif
