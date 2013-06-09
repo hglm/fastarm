@@ -631,10 +631,6 @@ asm_function memcpy_armv5te
     subne   r2, r2, #16
     stmiane r0!, {r3, r5-r7}
 .endif
-.if \preload_early == 1
-    pld     [r4, #(\line_size * 2)]
-    add     r4, #(\line_size * 3)
-.endif
 .if \write_align == 64
     cmp     r2, #32
     blt     14f
@@ -650,6 +646,10 @@ asm_function memcpy_armv5te
     blt     2f
 .elseif \write_align == 64
     cmp     r2, #64
+.if \preload_early == 1
+    pld     [r4, #(\line_size * 2)]
+    add     r4, #(\line_size * 3)
+.endif
     mov     r9, #\preload_offset
     blt     2f
     cmp     r2, #(\preload_offset + 64)
@@ -661,6 +661,10 @@ asm_function memcpy_armv5te
 .elseif \write_align == 32
     /* In the case of write_align == 32 r9 will be equal to preload_offset. */
     cmp     r2, #32
+.if \preload_early == 1
+    pld     [r4, #(\line_size * 2)]
+    add     r4, #(\line_size * 3)
+.endif
     mov     r9, #\preload_offset
     blt     2f
     cmp     r2, #(\preload_offset + 32)
@@ -669,9 +673,13 @@ asm_function memcpy_armv5te
 .else
     ble     10f
 .endif
-.else
+.else // write_align == 16
     cmp     r2, #32
     add     r9, r1, #\preload_offset
+.if \preload_early == 1
+    pld     [r4, #(\line_size * 2)]
+    add     r4, #(\line_size * 3)
+.endif
     bic     r9, r9, #31
     /* If there are less than 32 bytes to go, skip all loops. */
     blt     2f
