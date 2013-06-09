@@ -36,7 +36,9 @@
  * On the Allwinner A10 platform, armv5te_no_overfetch_align_32_block_write_32_preload_early_192
  * is a good choice.
  *
- * Both are faster than the system default memcpy, although RPi's libcofi does relatively well.
+ * On the Allwinner plaform, the optimized memcpy is faster; on the RPi libcofi does relatively well
+ * and is a little faster in some tests for aligned regions while being slower for unaligned
+ * copies.
  */
 
 /* Prevent the stack from becoming executable */
@@ -1147,7 +1149,7 @@ asm_function memcpy_armv5te_no_overfetch
 .endfunc
 
 asm_function memcpy_armv5te_overfetch
-    MEMCPY_VARIANT 32, 16, 16, 128, 1, 1
+    MEMCPY_VARIANT 32, 16, 16, 96, 1, 1
 .endfunc
 
 #else
