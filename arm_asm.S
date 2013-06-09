@@ -26,7 +26,7 @@
  *    was required for correct linkage on my platform.
  * 2. Add non-overfetching memcpy version with a plethora of optimizations and variants using
  *    macros.
- *    To do: -- Implement line_size == 64 and write_align == 64 for unaligned case.
+ *    To do: -- Fully implement line_size == 64 and write_align == 64 for unaligned case.
  *
  * On the RPi platform, a good choice is armv5te_no_overfetch_align_16_block_write_16_preload_early_128,
  * closely followed by armv5te_no_overfetch_align_16_block_write_16_preload_early_96. For
@@ -656,8 +656,11 @@ asm_function memcpy_armv5te
 .if \preload_offset == 0
     cmp     r2, #32
     blt     2f
-.elseif \write_align == 64
+.elseif \write_align == 64 || \line_size == 64
     cmp     r2, #64
+.if \line_size == 64 && \write_align == 32
+    add     r9, r1, #\preload_offset
+.endif
 .if \preload_early == 1
 .if \line_size == 32
     pld     [r4, #(\line_size * 2)]
@@ -666,28 +669,7 @@ asm_function memcpy_armv5te
     add     r4, #(\line_size * 2)
 .endif
 .endif
-    mov     r9, #\preload_offset
-.if \preload_early == 1
-    add     r11, r1, #\preload_offset
-.endif
-    blt     2f
-    cmp     r2, #(\preload_offset + 64)
-.if \overfetch == 1
-    ble     1f
-.else
-    ble     10f
-.endif
-.elseif \write_align == 32
-    /* In the case of line_size == 32 and write_align == 32 r9 will be equal to preload_offset. */
-    cmp     r2, #32
-.if \line_size == 64
-    add     r9, r1, #\preload_offset
-.endif
-.if \preload_early == 1
-    pld     [r4, #(\line_size * 2)]
-    add     r4, #(\line_size * 3)
-.endif
-.if \line_size == 64
+.if \line_size == 64 && \write_align == 32
     bic     r9, r9, #63
 .else
     mov     r9, #\preload_offset
@@ -696,13 +678,31 @@ asm_function memcpy_armv5te
 .endif
 .endif
     blt     2f
-    cmp     r2, #(\preload_offset + 32)
-.if \line_size == 64
+    cmp     r2, #(\preload_offset + 64)
+.if \line_size == 64 && \write_align == 32
 .if \preload_early == 1
     mov     r11, r9
 .endif
     sub     r9, r9, r1
 .endif
+.if \overfetch == 1
+    ble     1f
+.else
+    ble     10f
+.endif
+.elseif \write_align == 32
+    /* In the case of line_size == 32 and write_align == 32 r9 will be equal to preload_offset. */
+    cmp     r2, #32
+.if \preload_early == 1
+    pld     [r4, #(\line_size * 2)]
+    add     r4, #(\line_size * 3)
+.endif
+    mov     r9, #\preload_offset
+.if \preload_early == 1
+    add     r11, r1, #\preload_offset
+.endif
+    blt     2f
+    cmp     r2, #(\preload_offset + 32)
 .if \overfetch == 1
     ble     1f
 .else
@@ -745,12 +745,16 @@ asm_function memcpy_armv5te
     add     ip, #64
     ldmialt r1!, {r3-r6, r7, r8, r10, r11}
     bge     1f
-.if \line_size == 32
+.if \line_size == 64 || \write_align == 64
+    cmp     r2, #(\preload_offset + 64 + 32)
+.if \line_size == 64
+    pld     [ip]
+.else
+    pld     [ip, #-32]
+.endif
+.else
     cmp     r2, #(\preload_offset + 32 + 32)
     pld     [ip, #-32]
-.else
-    cmp     r2, #(\preload_offset + 64 + 32)
-    pld     [ip]
 .endif
     sub     r2, r2, #32
 .if \block_write_size == 32
@@ -776,12 +780,16 @@ asm_function memcpy_armv5te
     add     ip, #64
     ldmialt r1!, {r3-r6, r7, r8, r10, r11}
     bge     1f
-.if \line_size == 32
+.if \line_size == 64 || \write_align == 64
+    cmp     r2, #(\preload_offset + 64 + 32)
+.if \line_size == 64
+    pld     [ip]
+.else
+    pld     [ip, #-32]
+.endif
+.else
     cmp     r2, #(\preload_offset + 32 + 32)
     pld     [ip, #-32]
-.else
-    cmp     r2, #(\preload_offset + 64 + 32)
-    pld     [ip]
 .endif
     sub     r2, r2, #32
 .if \block_write_size == 32
@@ -805,13 +813,16 @@ asm_function memcpy_armv5te
 .endif
 .endif
 1:
-.if \line_size == 64
+.if \line_size == 64 || \write_align == 64
 .if \overfetch == 1
     cmp     r2, #(64 + 64)
 .else
     cmp     r2, #(\preload_offset + 64 + 64)
 .endif
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+.if \line_size == 32
+    pld     [r1, r9]
+.endif
     sub     r2, r2, #64
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
@@ -850,7 +861,7 @@ asm_function memcpy_armv5te
 .endif /* preload_offset != 0 */
 .if \overfetch == 0
 10:
-.if \line_size == 64
+.if \line_size == 64 || \write_align == 64
     cmp     r2, #(64 + 64)
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     sub     r2, r2, #64
@@ -880,11 +891,11 @@ asm_function memcpy_armv5te
     stmia   r0!, {r7-r8}
     stmia   r0!, {r10-r11}
 .endif
-.endif /* line_size == 64 */
+.endif /* line_size == 64 || write_align == 64  */
     bge     10b
 .endif /* overfetch == 0 */
 2:
-.if \line_size == 64
+.if \line_size == 64 || \write_align == 64
     tst     r2, #32
     ldmiane r1!, {r3-r6, r7, r8, r10, r11}
     stmiane r0!, {r3-r6, r7, r8, r10, r11}
@@ -1063,9 +1074,21 @@ asm_function memcpy_armv5te
     /* Optimize the branches based on the number of bytes left, */
     /* since we know that number of bytes left < line_size * 5. */
     /* ( < line_size * 3 if line_size is 64). */
-.if \write_align == 64
+.if \write_align == 64 || \line_size == 64
     cmp     r2, #64
+.if \line_size == 64 && \write_align == 32
+    add     r9, r1, #\preload_offset
+    bic     r9, r9, #63
+.if \preload_early == 1
+    mov     r11, r9
+.endif
+    sub     r9, r9, r1
+.else
     mov     r9, #\preload_offset
+.if \preload_early == 1
+    add     r11, r1, #\preload_offset
+.endif
+.endif
     blt     2b
 .if \line_size == 64 && (\line_size * 3) <= (\preload_offset + 64)
     b       10b
@@ -1079,8 +1102,23 @@ asm_function memcpy_armv5te
 .elseif \write_align == 32
     /* In the case of write_align == 32 r9 will be equal to preload_offset. */
     cmp     r2, #32
+.if \line_size == 64
+    add     r9, r1, #\preload_offset
+    bic     r9, r9, #63
+.if \preload_early == 1
+    mov     r11, r9
+.endif
+    sub     r9, r9, r1
+.else
     mov     r9, #\preload_offset
-.if (\line_size * 5) <= (\preload_offset + 32) && 0
+.if \preload_early == 1
+    add     r11, r1, #\preload_offset
+.endif
+.endif
+.if \line_size == 64 && (\line_size * 3) <= (\preload_offset + 32)
+    bge     10b
+    b       2b
+.elseif \line_size == 32 && (\line_size * 5) <= (\preload_offset + 32)
     bge     10b
     b       2b
 .else
@@ -1236,11 +1274,11 @@ asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_192
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_256
-    MEMCPY_VARIANT 64, 64, 32, 256, 0, 0
+    MEMCPY_VARIANT 32, 64, 32, 256, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_early_256
-    MEMCPY_VARIANT 64, 64, 32, 256, 1, 0
+    MEMCPY_VARIANT 32, 64, 32, 256, 1, 0
 .endfunc
 
 /* Overfetching versions. */
