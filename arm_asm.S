@@ -333,8 +333,12 @@ asm_function memcpy_armv5te
     pop     {r5}
 .endif
     blt     3f
-.if \preload_offset != 0 && \overfetch == 0
+.if \preload_offset != 0
+.if \overfetch == 1
+    cmp     r2, #64
+.else
     cmp     r2, #\preload_offset
+.endif
 .endif
     stmfd   sp!, {r7, r8, r9, r10, r11}
 .if \preload_offset != 0
@@ -347,6 +351,8 @@ asm_function memcpy_armv5te
 .if \overfetch == 0
     /* If there are <= preload_offset bytes to go, skip the main loop. */
     ble     4f
+.else
+    blt     1f
 .endif
 .if \line_size == 32 && \preload_early == 1 && \preload_offset >= 64 && block_write_size >= 16
     mov     r11, r5
@@ -635,7 +641,7 @@ asm_function memcpy_armv5te
 .endif
     /* Source is now write_align bytes aligned. */
 20:
-.if \preload_offset == 0 || \overfetch == 1
+.if \preload_offset == 0
     cmp     r2, #32
     blt     2f
 .elseif \write_align == 64
