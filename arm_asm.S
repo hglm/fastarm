@@ -578,13 +578,11 @@ asm_function memcpy_armv5te
     /* The standard code path for early preload will preload up to [r3 + line_size * 4]. */
     /* To avoid preloads beyond the source region for medium sizes, there is a seperate */
     /* path for them when early preload is enabled. */
-.if \overfetch == 0
     cmp     r2, #(\line_size * 5)
-.endif
     pld     [r4, #\line_size]
 .endif
     stmfd   sp!, {r5, r6}
-.if \preload_early == 1 && \overfetch == 0
+.if \preload_early == 1 // && \overfetch == 0
     blt     17f
 .endif
     tst     r0, #2
@@ -928,7 +926,6 @@ asm_function memcpy_armv5te
     bx     lr
 
     /* Special code path for medium sizes when early preload is enabled. */
-.if \overfetch == 0
     .p2align 4
 17:
     tst     r0, #2
@@ -936,28 +933,38 @@ asm_function memcpy_armv5te
     ldrbne  r5, [r1], #1
     subne   r2, r2, #2
     orrne   r3, r3, r5, asl #8
+.if \overfetch == 0
     /* Determine the address of the last byte. */
     add     r6, r1, r2
+.endif
     strhne  r3, [r0], #2
 
     /* destination address is 4 bytes aligned */
     /* now we should handle 4 cases of source address alignment */
     tst     r1, #1
+.if \overfetch == 0
     sub     r6, r6, #1
+.endif
     add     r4, r4, \line_size
+.if \overfetch == 0
     bic     r6, r6, #(\line_size - 1)
+.endif
     bne     6b
     tst     r1, #2
     add     r5, r4, #\line_size
     bne     7b
 
     /* both source and destination are 4 bytes aligned */
+.if \overfetch == 0
     cmp     r6, r5
+.endif
     stmfd   sp!, {r7, r8, r9, r10, r11}
+.if \overfetch == 0
     mov     r8, r6
     /* Only preload if the source region extends into it. */
-    movge   r4, r5
+    movlt   r4, r5
     blt     15f
+.endif
     pld     [r5]
     add     r4, r5, #\line_size
 15:
@@ -975,9 +982,11 @@ asm_function memcpy_armv5te
     subne   r2, r2, #16
     stmiane r0!, {r3, r5-r7}
 .endif
+.if \overfetch == 0
     /* Only preload if the source region extends into it. */
     cmp     r8, r4
     blt     18f
+.endif
     pld     [r4]
     add     r4, r4, #\line_size
 18:
@@ -1036,7 +1045,6 @@ asm_function memcpy_armv5te
     b       19b
 .endif
 .endif
-.endif /* overfetch == 0 */
  .endm
 
 #ifdef RPI_BEST_MEMCPY_ONLY
