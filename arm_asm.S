@@ -21,7 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  *
  * Copyright 2013 Harm Hanemaaijer <fgenfb@yahoo.com>
- * 
+ *
  * 1. Add ".type <function_name>, function" to function definition macro, which
  *    was required for correct linkage on my platform.
  * 2. Add non-overfetching memcpy version with a plethora of optimizations and variants using
@@ -277,7 +277,7 @@ asm_function memcpy_armv5te
  * r4 is the address of the 32-byte aligned region where the last preload occured
  */
 
-.macro  UNALIGNED_MEMCPY_NO_OVERFETCH shift, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
+.macro  UNALIGNED_MEMCPY_VARIANT shift, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
     sub     r1, #(\shift)
 .if \preload_early == 1
     add     r5, r4, #\line_size
@@ -552,7 +552,7 @@ asm_function memcpy_armv5te
  * must be a multiple of 64.
  */
 
-.macro MEMCPY_NO_OVERFETCH line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
+.macro MEMCPY_VARIANT line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
 .if \preload_early == 1
     bic     r3, r1, #(\line_size - 1)
 .endif
@@ -574,11 +574,13 @@ asm_function memcpy_armv5te
     ldrbne  r3, [r1], #1
     subne   r2, r2, #1
     strbne  r3, [r0], #1
-.if \preload_early == 1 && \overfetch == 0
+.if \preload_early == 1
     /* The standard code path for early preload will preload up to [r3 + line_size * 4]. */
     /* To avoid preloads beyond the source region for medium sizes, there is a seperate */
     /* path for them when early preload is enabled. */
+.if \overfetch == 0
     cmp     r2, #(\line_size * 5)
+.endif
     pld     [r4, #\line_size]
 .endif
     stmfd   sp!, {r5, r6}
@@ -599,10 +601,14 @@ asm_function memcpy_armv5te
     /* now we should handle 4 cases of source address alignment */
     tst     r1, #1
 .if \preload_early == 1
+.if \overfetch == 0
     sub     r6, r6, #1
+.endif
     pld     [r4, #(\line_size * 2)]
     add     r4, #(\line_size * 2)
+.if \overfetch == 0
     bic     r6, r6, #(\line_size - 1)
+.endif
 .endif
     bne     6f
     tst     r1, #2
@@ -854,11 +860,12 @@ asm_function memcpy_armv5te
 6:
     tst    r1, #2
     bne    8f
-    UNALIGNED_MEMCPY_NO_OVERFETCH 1, \line_size, \write_align, \block_write_size, \preload_offset, \preload_early, \overfetch
+    UNALIGNED_MEMCPY_VARIANT 1, \line_size, \write_align, \block_write_size, \preload_offset, \preload_early, \overfetch
 7:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 2, \line_size, \write_align, \block_write_size, \preload_offset, \preload_early, \overfetch
+    UNALIGNED_MEMCPY_VARIANT 2, \line_size, \write_align, \block_write_size, \preload_offset, \preload_early, \overfetch
 8:
-    UNALIGNED_MEMCPY_NO_OVERFETCH 3, \line_size, \write_align, \block_write_size, \preload_offset, \preload_early, \overfetch
+    UNALIGNED_MEMCPY_VARIANT 3, \line_size, \write_align, \block_write_size, \preload_offset, \preload_early, \overfetch
+    .p2align 4
 9:
     /*
      * Size < 36.
@@ -919,8 +926,10 @@ asm_function memcpy_armv5te
     ldmfd  sp!, {r0, r4}
     strbne r3, [ip], #1
     bx     lr
+
     /* Special code path for medium sizes when early preload is enabled. */
 .if \overfetch == 0
+    .p2align 4
 17:
     tst     r0, #2
     ldrbne  r3, [r1], #1
@@ -1033,139 +1042,139 @@ asm_function memcpy_armv5te
 #ifdef RPI_BEST_MEMCPY_ONLY
 
 asm_function memcpy_armv5te_no_overfetch
-    MEMCPY_NO_OVERFETCH 32, 16, 16, 128, 1, 0
+    MEMCPY_VARIANT 32, 16, 16, 128, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_overfetch
-    MEMCPY_NO_OVERFETCH 32, 16, 16, 128, 1, 1
+    MEMCPY_VARIANT 32, 16, 16, 128, 1, 1
 .endfunc
 
 #else
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8_preload_96
-    MEMCPY_NO_OVERFETCH 32, 16, 8, 96, 0, 0
+    MEMCPY_VARIANT 32, 16, 8, 96, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_96
-    MEMCPY_NO_OVERFETCH 32, 16, 16, 96, 0, 0
+    MEMCPY_VARIANT 32, 16, 16, 96, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_early_96
-    MEMCPY_NO_OVERFETCH 32, 16, 16, 96, 1, 0
+    MEMCPY_VARIANT 32, 16, 16, 96, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_early_128
-    MEMCPY_NO_OVERFETCH 32, 16, 16, 128, 1, 0
+    MEMCPY_VARIANT 32, 16, 16, 128, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_8_preload_96
-    MEMCPY_NO_OVERFETCH 32, 32, 8, 96, 0, 0
+    MEMCPY_VARIANT 32, 32, 8, 96, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_64
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 64, 0, 0
+    MEMCPY_VARIANT 32, 32, 16, 64, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_96
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 96, 0, 0
+    MEMCPY_VARIANT 32, 32, 16, 96, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_128
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 128, 0, 0
+    MEMCPY_VARIANT 32, 32, 16, 128, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_160
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 160, 0, 0
+    MEMCPY_VARIANT 32, 32, 16, 160, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_192
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 192, 0, 0
+    MEMCPY_VARIANT 32, 32, 16, 192, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_256
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 256, 0, 0
+    MEMCPY_VARIANT 32, 32, 16, 256, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_64
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 64, 0, 0
+    MEMCPY_VARIANT 32, 32, 32, 64, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_96
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 96, 0, 0
+    MEMCPY_VARIANT 32, 32, 32, 96, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_128
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 128, 0, 0
+    MEMCPY_VARIANT 32, 32, 32, 128, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_160
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 160, 0, 0
+    MEMCPY_VARIANT 32, 32, 32, 160, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_192
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 192, 0, 0
+    MEMCPY_VARIANT 32, 32, 32, 192, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_256
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 256, 0, 0
+    MEMCPY_VARIANT 32, 32, 32, 256, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_96
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 96, 1, 0
+    MEMCPY_VARIANT 32, 32, 16, 96, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_128
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 128, 1, 0
+    MEMCPY_VARIANT 32, 32, 16, 128, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_192
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 192, 1, 0
+    MEMCPY_VARIANT 32, 32, 16, 192, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_preload_early_256
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 256, 1, 0
+    MEMCPY_VARIANT 32, 32, 16, 256, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_128
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 128, 1, 0
+    MEMCPY_VARIANT 32, 32, 32, 128, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_192
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 192, 1, 0
+    MEMCPY_VARIANT 32, 32, 32, 192, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_preload_early_256
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 256, 1, 0
+    MEMCPY_VARIANT 32, 32, 32, 256, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_16_no_preload
-    MEMCPY_NO_OVERFETCH 32, 32, 16, 0, 0, 0
+    MEMCPY_VARIANT 32, 32, 16, 0, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_no_preload
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 0, 0, 0
+    MEMCPY_VARIANT 32, 32, 32, 0, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_128
-    MEMCPY_NO_OVERFETCH 64, 64, 32, 128, 0, 0
+    MEMCPY_VARIANT 64, 64, 32, 128, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_192
-    MEMCPY_NO_OVERFETCH 64, 64, 32, 192, 0, 0
+    MEMCPY_VARIANT 64, 64, 32, 192, 0, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_256
-    MEMCPY_NO_OVERFETCH 64, 64, 32, 256, 0, 0
+    MEMCPY_VARIANT 64, 64, 32, 256, 0, 0
 .endfunc
 
 /* Overfetching versions. */
 
 asm_function memcpy_armv5te_overfetch_align_16_block_write_16_preload_early_128
-    MEMCPY_NO_OVERFETCH 32, 16, 16, 128, 1, 1
+    MEMCPY_VARIANT 32, 16, 16, 128, 1, 1
 .endfunc
 
 asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
-    MEMCPY_NO_OVERFETCH 32, 32, 32, 192, 1, 1
+    MEMCPY_VARIANT 32, 32, 32, 192, 1, 1
 .endfunc
 
 #endif
