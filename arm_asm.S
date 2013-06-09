@@ -354,7 +354,7 @@ asm_function memcpy_armv5te
 .else
     blt     1f
 .endif
-.if \line_size == 32 && \preload_early == 1 && \preload_offset >= 64 && block_write_size >= 16
+.if \preload_early == 1 && \preload_offset >= 64 && block_write_size >= 16
     mov     r11, r5
     pld     [r5, #-\line_size]
     /* The last preload already done is at [r11 - line_size]. */
@@ -1102,18 +1102,9 @@ asm_function memcpy_armv5te
 .elseif \write_align == 32
     /* In the case of write_align == 32 r9 will be equal to preload_offset. */
     cmp     r2, #32
-.if \line_size == 64
-    add     r9, r1, #\preload_offset
-    bic     r9, r9, #63
-.if \preload_early == 1
-    mov     r11, r9
-.endif
-    sub     r9, r9, r1
-.else
     mov     r9, #\preload_offset
 .if \preload_early == 1
     add     r11, r1, #\preload_offset
-.endif
 .endif
 .if \line_size == 64 && (\line_size * 3) <= (\preload_offset + 32)
     bge     10b
@@ -1265,20 +1256,28 @@ asm_function memcpy_armv5te_no_overfetch_align_32_block_write_32_no_preload
     MEMCPY_VARIANT 32, 32, 32, 0, 0, 0
 .endfunc
 
-asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_128
-    MEMCPY_VARIANT 32, 64, 32, 128, 0, 0
+asm_function memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_128
+    MEMCPY_VARIANT 64, 32, 32, 128, 1, 0
 .endfunc
 
-asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_192
-    MEMCPY_VARIANT 32, 64, 32, 192, 0, 0
+asm_function memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_192
+    MEMCPY_VARIANT 64, 32, 32, 192, 1, 0
 .endfunc
 
-asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_256
-    MEMCPY_VARIANT 32, 64, 32, 256, 0, 0
+asm_function memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_256
+    MEMCPY_VARIANT 64, 32, 32, 256, 1, 0
 .endfunc
 
-asm_function memcpy_armv5te_no_overfetch_align_64_block_write_32_preload_early_256
-    MEMCPY_VARIANT 32, 64, 32, 256, 1, 0
+asm_function memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_320
+    MEMCPY_VARIANT 64, 32, 32, 320, 1, 0
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_line_64_align_64_block_write_32_preload_early_256
+    MEMCPY_VARIANT 64, 64, 32, 256, 1, 0
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_line_64_align_64_block_write_32_preload_early_320
+    MEMCPY_VARIANT 64, 64, 32, 320, 1, 0
 .endfunc
 
 /* Overfetching versions. */
