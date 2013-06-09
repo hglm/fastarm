@@ -5,6 +5,8 @@ extern void *memcpy_armv5te(void *dest, const void *src, int n);
 
 extern void *memcpy_armv5te_no_overfetch(void *dest, const void *src, int n);
 
+extern void *memcpy_armv5te_overfetch(void *dest, const void *src, int n);
+
 #else
 
 extern void *memcpy_armv5te_no_overfetch_align_16_block_write_8_preload_96(void *dest,

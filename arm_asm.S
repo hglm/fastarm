@@ -1036,6 +1036,10 @@ asm_function memcpy_armv5te_no_overfetch
     MEMCPY_NO_OVERFETCH 32, 16, 16, 128, 1, 0
 .endfunc
 
+asm_function memcpy_armv5te_overfetch
+    MEMCPY_NO_OVERFETCH 32, 16, 16, 128, 1, 1
+.endfunc
+
 #else
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8_preload_96
