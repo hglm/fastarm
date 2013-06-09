@@ -291,7 +291,7 @@ asm_function memcpy_armv5te
 .endif
     pld     [r5]
 5:
-.if \write_align == 32
+.if \write_align >= 32
     /* Need a place to store r5. */
     push    {r5}
 .endif
@@ -313,7 +313,7 @@ asm_function memcpy_armv5te
     orrne   r4, r4, ip, asl #(32 - \shift * 8)
     stmiane r0!, {r3-r4}
 
-.if \write_align == 32
+.if \write_align >= 32
     tst     r0, #16
     movne   r3, ip, lsr #(\shift * 8)
     ldmiane r1!, {r4-r6, ip}
@@ -329,7 +329,7 @@ asm_function memcpy_armv5te
 .endif
 
     cmp     r2, #32
-.if \preload_early == 1 && \write_align == 32
+.if \preload_early == 1 && \write_align >= 32
     pop     {r5}
 .endif
     blt     3f
@@ -381,7 +381,9 @@ asm_function memcpy_armv5te
     stmia   r0!, {r3-r6}
     mov     r3, r7
     ldmia   r1!, {r4, r5, r6, ip}
+.if \line_size == 32
     pld     [r11, #-32]
+.endif
     orr     r3, r3, r4, asl #(32 - \shift * 8)
     add     r10, r1, r9
     mov     r4, r4, lsr #(\shift * 8)
