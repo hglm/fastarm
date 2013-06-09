@@ -1,4 +1,5 @@
-CONFIG_FLAGS =
+CONFIG_FLAGS = # -DINCLUDE_LIBARMMEM_MEMCPY
+#LIBARMMEM = -larmmem
 CFLAGS = -std=gnu99 -Ofast -Wall $(CONFIG_FLAGS)
 PCFLAGS = -std=gnu99 -O -Wall $(CONFIG_FLAGS) -pg -ggdb
 
@@ -9,10 +10,10 @@ libfastarm.a : fastarm.o
 	ar r libfastarm.a fastarm.o
 
 benchmark : benchmark.o arm_asm.o libfastarm.a fastarm.h arm_asm.h
-	gcc $(CFLAGS) benchmark.o arm_asm.o -o benchmark libfastarm.a -lm -lrt
+	gcc $(CFLAGS) benchmark.o arm_asm.o -o benchmark libfastarm.a -lm -lrt $(LIBARMMEM)
 
 benchmarkp : benchmark.c arm_asm.S fastarm.h fastarm.c
-	gcc $(PCFLAGS) benchmark.c arm_asm.S fastarm.c -o benchmarkp -lc -lm -lrt
+	gcc $(PCFLAGS) benchmark.c arm_asm.S fastarm.c -o benchmarkp -lc -lm -lrt $(LIBARMMEM)
 
 install : libfastarm.a fastarm.h
 	install -m 0644 fastarm.h /usr/include

@@ -37,7 +37,18 @@
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
+
+#ifdef INCLUDE_LIBARMMEM_MEMCPY
+
+void *armmem_memcpy(void * restrict s1, const void * restrict s2, size_t n);
+
+#define NU_MEMCPY_VARIANTS 38
+
+#else
+
 #define NU_MEMCPY_VARIANTS 37
+
+#endif
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
@@ -50,6 +61,9 @@ int memcpy_mask[NU_MEMCPY_VARIANTS];
 static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "standard memcpy",
     "libfastarm memcpy",
+#ifdef INCLUDE_LIBARMMEM_MEMCPY
+    "libarmmem memcpy",
+#endif
     "armv5te memcpy",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 8, preload offset 96",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 16, preload offset 96",
@@ -90,6 +104,9 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
 static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy,
     fastarm_memcpy,
+#ifdef INCLUDE_LIBARMMEM_MEMCPY
+    armmem_memcpy,
+#endif
     memcpy_armv5te,
     memcpy_armv5te_no_overfetch_align_16_block_write_8_preload_96,
     memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_96,
