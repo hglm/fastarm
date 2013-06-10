@@ -32,7 +32,6 @@
 #include <sys/time.h>
 #include <math.h>
 
-#include "fastarm.h"
 #include "arm_asm.h"
 
 #define DEFAULT_TEST_DURATION 2.0
@@ -42,11 +41,11 @@
 
 void *armmem_memcpy(void * restrict s1, const void * restrict s2, size_t n);
 
-#define NU_MEMCPY_VARIANTS 38
+#define NU_MEMCPY_VARIANTS 37
 
 #else
 
-#define NU_MEMCPY_VARIANTS 37
+#define NU_MEMCPY_VARIANTS 36
 
 #endif
 
@@ -60,7 +59,6 @@ int memcpy_mask[NU_MEMCPY_VARIANTS];
 
 static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "standard memcpy",
-    "libfastarm memcpy",
 #ifdef INCLUDE_LIBARMMEM_MEMCPY
     "libarmmem memcpy",
 #endif
@@ -103,7 +101,6 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
 
 static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy,
-    fastarm_memcpy,
 #ifdef INCLUDE_LIBARMMEM_MEMCPY
     armmem_memcpy,
 #endif
@@ -502,7 +499,7 @@ static void do_validation(int repeat) {
         fill_buffer(buffer_alloc);
         memcpy_func(buffer_alloc + dest, buffer_alloc + source, size);
         if (!compare_buffers(buffer_alloc, buffer_compare)) {
-            printf("Validation failed (source offset = %d, destination offset = %d, size = %d.\n",
+            printf("Validation failed (source offset = 0x%08X, destination offset = 0x%08X, size = %d.\n",
                 source, dest, size);
             passed = 0;
         }

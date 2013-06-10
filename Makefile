@@ -3,35 +3,23 @@ CONFIG_FLAGS = # -DINCLUDE_LIBARMMEM_MEMCPY
 CFLAGS = -std=gnu99 -Ofast -Wall $(CONFIG_FLAGS)
 PCFLAGS = -std=gnu99 -O -Wall $(CONFIG_FLAGS) -pg -ggdb
 
-all : libfastarm.a benchmark
+all : benchmark
 
-libfastarm.a : fastarm.o
-	rm -f libfastarm.a
-	ar r libfastarm.a fastarm.o
+benchmark : benchmark.o arm_asm.o
+	gcc $(CFLAGS) benchmark.o arm_asm.o -o benchmark -lm -lrt $(LIBARMMEM)
 
-benchmark : benchmark.o arm_asm.o libfastarm.a fastarm.h arm_asm.h
-	gcc $(CFLAGS) benchmark.o arm_asm.o -o benchmark libfastarm.a -lm -lrt $(LIBARMMEM)
-
-benchmarkp : benchmark.c arm_asm.S fastarm.h fastarm.c
-	gcc $(PCFLAGS) benchmark.c arm_asm.S fastarm.c -o benchmarkp -lc -lm -lrt $(LIBARMMEM)
-
-install : libfastarm.a fastarm.h
-	install -m 0644 fastarm.h /usr/include
-	install -m 0644 libfastarm.a /usr/lib
+benchmarkp : benchmark.c arm_asm.S
+	gcc $(PCFLAGS) benchmark.c arm_asm.S  -o benchmarkp -lc -lm -lrt $(LIBARMMEM)
 
 clean :
-	rm -f libfastarm.a
-	rm -f fastarm.o
 	rm -f benchmark
 	rm -f benchmark.o
 	rm -f benchmarkp
 	rm -f arm_asm.o
 
-fastarm.o : fastarm.c fastarm.h
+benchmark.o : benchmark.c arm_asm.h
 
-benchmark.o : benchmark.c
-
-arm_asm.o : arm_asm.S
+arm_asm.o : arm_asm.S arm_asm.h
 
 .c.o : 
 	$(CC) -c $(CFLAGS) $< -o $@
