@@ -1075,7 +1075,7 @@ asm_function memcpy_armv5te_no_overfetch
 .endfunc
 
 asm_function memcpy_armv5te_overfetch
-    MEMCPY_VARIANT 32, 16, 16, 96, 1, 1
+    MEMCPY_VARIANT 32, 16, 16, 128, 1, 1
 .endfunc
 
 #else
