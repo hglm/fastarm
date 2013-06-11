@@ -278,7 +278,7 @@ asm_function memcpy_armv5te
  * the new version so should not be enabled.
  */
 
-// #define PRELOAD_CATCH_UP
+#define PRELOAD_CATCH_UP
 
 /*
  * CHECK_EARLY_PRELOADS enables checks to avoid overfetching beyond the source region when
@@ -383,6 +383,7 @@ asm_function memcpy_armv5te
     /* The last preload already done is at [r11 - line_size]. */
     /* The next preload in the main loop will happen at [r10]. */
     /* If r11 < r10, we want to do an extra preload at [r11]. */
+#if 0
 18:
     cmp     r11, r10
     add     r11, #64
@@ -419,6 +420,7 @@ asm_function memcpy_armv5te
 .if \overfetch == 0
     b       4f
 .endif
+#endif
 #endif
 .endif
 1:
@@ -664,7 +666,7 @@ asm_function memcpy_armv5te
      * If the number of bytes left is <= (preload_offset + chunk_size), skip the 
      * loop with preload and jump to the loop without preload.
      * Also calculate the preload offset in r9 and the address of the next main loop preload
-     * in r5 if early preload is enabled.
+     * in r5 if early preload is enabled and PRELOAD_CATCH_UP is set.
      * If preload is enabled, r3 is updated to hold the address of the next early preload.
      */
 .if \preload_offset == 0
@@ -685,9 +687,11 @@ asm_function memcpy_armv5te
 .if \line_size == 64 && \write_align == 32
     bic     r5, r5, #63
 .else
+#ifdef PRELOAD_CATCH_UP
 .if \preload_early == 1
     add     r5, r1, #\preload_offset
 .endif
+#endif
 .endif
     blt     2f
     cmp     r2, #(\preload_offset + 64)
@@ -711,9 +715,11 @@ asm_function memcpy_armv5te
     add     r3, #(\line_size * 3)
 #endif
 .endif
+#ifdef PRELOAD_CATCH_UP
 .if \preload_early == 1
     add     r5, r1, #\preload_offset
 .endif
+#endif
     blt     14f
     cmp     r2, #(\preload_offset + 32)
     stmfd   sp!, {r8, r9, r10, r11}
@@ -748,85 +754,31 @@ asm_function memcpy_armv5te
 
 .if \preload_offset != 0
 .if \preload_early == 1
-#ifdef PRELOAD_CATCH_UP
+#ifndef PRELOAD_CATCH_UP
+    pld     [r3, #(\line_size * 3)]
+#else
 .if \block_write_size >= 16 && \preload_offset >= 96
-    /* The last preload already done is at [ip]. */
-    /* The next preload in the main loop will happen at [r11 + line_size]. */
-    /* If ip < r11, we want to do an extra preload at [ip + line_size]. */
-    /* Note: if line_size is 64 and write alignment is 64, write alignment */
-    /* may become unaligned. */
-    cmp     r4, r11
-    mov     ip, r4
-    pld     [r4]
-    add     ip, #64
-    ldmialt r1!, {r3-r6, r7, r8, r10, r11}
-    bge     1f
-.if \line_size == 64 || \write_align == 64
-    cmp     r2, #(\preload_offset + 64 + 32)
-.if \line_size == 64
-    pld     [ip]
-.else
-    pld     [ip, #-32]
-.endif
-.else
-    cmp     r2, #(\preload_offset + 32 + 32)
-    pld     [ip, #-32]
-.endif
-    sub     r2, r2, #32
-.if \block_write_size == 32
-    stmia   r0!, {r3-r6, r7, r8, r10, r11}
-    add     r4, r1, r9
-.else
-    stmia   r0!, {r3-r6}
-    add     r4, r1, r9
-    stmia   r0!, {r7, r8, r10, r11}
-.endif
-.if \line_size == 32
-    pld     [ip]
-.endif
-.if \overfetch  == 1
-    ble     1f
-.else
-    ble     10f
-.endif
-    /* Do other extra preloads if required. */
+    /*
+     * The last preload already done is at [r3 - line_size].
+     * The next preload in the main loop will happen at [r5 + line_size].
+     * If there are line-sized chunks in between that we have not yet preloaded,
+     * we want to do preloads for them.
+     * Note: if line_size is 64 and write alignment is 64, write alignment
+     * may become unaligned.
+     */
+    cmp     r3, r5
+    blt     1f
+    add     r3, r3, #\line_size
 13:
-    cmp     ip, r4
-    add     ip, #64
-    ldmialt r1!, {r3-r6, r7, r8, r10, r11}
-    bge     1f
-.if \line_size == 64 || \write_align == 64
-    cmp     r2, #(\preload_offset + 64 + 32)
-.if \line_size == 64
-    pld     [ip]
+    cmp     r3, r5
+    pld     [r3]
+    add     r3, r3, #\line_size
+    bge     13b
 .else
-    pld     [ip, #-32]
-.endif
-.else
-    cmp     r2, #(\preload_offset + 32 + 32)
-    pld     [ip, #-32]
-.endif
-    sub     r2, r2, #32
-.if \block_write_size == 32
-    stmia   r0!, {r3-r6, r7, r8, r10, r11}
-    add     r4, r1, r9
-.else
-    stmia   r0!, {r3-r6}
-    add     r4, r1, r9
-    stmia   r0!, {r7, r8, r10, r11}
-.endif
-.if \line_size == 32
-    pld     [ip]
-.endif
-    bgt     13b
-.if \overfetch == 0
-    b       10f
-.endif
-.else // !(block_write_size >= 16 && preload_offset >= 96)
-    pld     [r4]
+    pld     [r3]
 .endif
 #endif
-.endif
+.endif /* preload_early == 1 */
 1:
 .if \line_size == 64 || \write_align == 64
 .if \overfetch == 1
