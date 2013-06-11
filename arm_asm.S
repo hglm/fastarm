@@ -305,7 +305,7 @@ asm_function memcpy_armv5te
 .endif
     ldr     ip, [r1], #4
 .if \preload_early == 1
-#if CHECK_EARLY_PRELOADS
+#ifdef CHECK_EARLY_PRELOADS
 .if \overfetch == 0 
     cmp     r6, r7
     /* Only preload if the source region extends into it. */
@@ -359,9 +359,11 @@ asm_function memcpy_armv5te
     stmfd   sp!, {r8, r9, r10, r11}
 .if \preload_offset != 0
     add     r10, r1, #\preload_offset
+#ifdef PRELOAD_CATCH_UP
 .if \preload_early == 1 && \preload_offset >= 64
     add     r7, r7, #(\line_size * 2)
 .endif
+#endif
     bic     r10, r10, #31
     sub     r9, r10, r1
 .if \overfetch == 0
@@ -371,12 +373,16 @@ asm_function memcpy_armv5te
     blt     1f
 .endif
 .if \preload_early == 1 && \preload_offset >= 64 && block_write_size >= 16
+#ifdef PRELOAD_CATCH_UP
     mov     r11, r7
     pld     [r7, #-\line_size]
+#else
+    pld     [r7, #\line_size]
+#endif
+#ifdef PRELOAD_CATCH_UP
     /* The last preload already done is at [r11 - line_size]. */
     /* The next preload in the main loop will happen at [r10]. */
     /* If r11 < r10, we want to do an extra preload at [r11]. */
-#ifdef PRELOAD_CATCH_UP
 18:
     cmp     r11, r10
     add     r11, #64
@@ -593,19 +599,29 @@ asm_function memcpy_armv5te
     ldrbne  r5, [r1], #1
     subne   r2, r2, #2
     orrne   r4, r4, r5, asl #8
+#ifdef CHECK_EARLY_PRELOADS
     /* Determine the 32-byte aligned address of the last byte. */
     add     r6, r1, r2
+#endif
     strhne  r4, [r0], #2
     /* destination address is 4 bytes aligned */
 
     tst     r1, #1
+#ifdef CHECK_EARLY_PRELOADS
+.if \preload_eary == 1
     sub     r6, r6, #1
+.endif
+#endif
 .if \preload_early == 1
     pld     [r3, #\line_size]
 .endif
+#ifdef CHECK_EARLY_PRELOADS
+.if \preload_early == 1
     bic     r6, r6, #(\line_size - 1)
+.endif
     /* Determine the extent in line size-byte chunks. */
-    sub     ip, r6, r3
+//    sub     ip, r6, r3
+#endif
 
     /* now we should handle 4 cases of source address alignment */
     bne     6f
@@ -662,7 +678,9 @@ asm_function memcpy_armv5te
 .endif
 .if \preload_early == 1
     pld     [r3, #(\line_size * 2)]
+#ifdef PRELOAD_CATCH_UP
     add     r3, #(\line_size * 3)
+#endif
 .endif
 .if \line_size == 64 && \write_align == 32
     bic     r5, r5, #63
@@ -689,7 +707,9 @@ asm_function memcpy_armv5te
     cmp     r2, #32
 .if \preload_early == 1
     pld     [r3, #(\line_size * 2)]
+#ifdef PRELOAD_CATCH_UP
     add     r3, #(\line_size * 3)
+#endif
 .endif
 .if \preload_early == 1
     add     r5, r1, #\preload_offset
@@ -708,7 +728,9 @@ asm_function memcpy_armv5te
     add     r5, r1, #\preload_offset
 .if \preload_early == 1
     pld     [r3, #(\line_size * 2)]
+#ifdef PRELOAD_CATCH_UP
     add     r3, #(\line_size * 3)
+#endif
 .endif
     bic     r5, r5, #31
     /* If there are less than 32 bytes to go, skip all loops. */
