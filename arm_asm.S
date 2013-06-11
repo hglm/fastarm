@@ -760,12 +760,10 @@ asm_function memcpy_armv5te
      * The next preload in the main loop will happen at [r5 + line_size].
      * If there are line-sized chunks in between that we have not yet preloaded,
      * we want to do preloads for them.
-     * Note: if line_size is 64 and write alignment is 64, write alignment
-     * may become unaligned.
      */
     cmp     r3, r5
     blt     1f
-#if 1
+#if 0
     /* Implement catch-up using a simple loop. */
     add     r3, r3, #\line_size
 13:
@@ -774,8 +772,37 @@ asm_function memcpy_armv5te
     add     r3, r3, #\line_size
     bge     13b
 #else
-    /* Implement catch-up while processing chunks. To do. */
+    /*
+     * Implement catch-up while processing chunks. block_write_size of 32
+     * uses 16-byte writes because of a lack of registers.
+     * Note: if line_size is 64 and write alignment is 64, write alignment
+     * may become unaligned.
+     */
+    pld     [r3]
+    add     r3, r3, #\line_size
 13:
+    cmp     r3, r5
+    ldmiage r1!, {r7, r8, r10, r11}
+    addge   r5, #32
+    blt     1f
+.if \line_size == 64 || \write_align == 64
+    cmp     r2, #(\preload_offset + 64 + 32)
+.else
+    cmp     r2, #(\preload_offset + 32 + 32)
+.endif
+    pld     [r3]
+    stmia   r0!, {r7, r8, r10, r11}
+    add     r3, r3, #64
+    ldmia   r1!, {r7, r8, r10, r11}
+.if \line_size == 32
+    pld     [r3, #-\line_size]
+.endif
+    stmia   r0!, {r7, r8, r10, r11}
+    sub     r2, r2, #32
+    bgt     13b
+.if \overfetch == 0
+    b       10f
+.endif
 #endif
 .else
     pld     [r3]
