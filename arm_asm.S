@@ -630,9 +630,6 @@ asm_function memcpy_armv5te
 
     /* both source and destination are 4 bytes aligned */
     tst     r0, #4
-.if \preload_early == 1
-    pld     [r3, #(\line_size * 2)]
-.endif
     ldrne   r5, [r1], #4
     subne   r2, r2, #4
     strne   r5, [r0], #4
