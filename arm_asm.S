@@ -273,17 +273,16 @@ asm_function memcpy_armv5te
 .endfunc
 
 /*
- * PRELOAD_CATCH_UP enables code from a previous version to catch up the early preload offset
- * with the preload offset in the main loop. It is has not been fully integrated back into
- * the new version so should not be enabled.
+ * PRELOAD_CATCH_UP enables catching up the early preload offset with the preload offset in
+ * the main loop.
  */
 
 #define PRELOAD_CATCH_UP
 
 /*
  * CHECK_EARLY_PRELOADS enables checks to avoid overfetching beyond the source region when
- * doing early preloads. It is has not been fully integrated back into
- * the new version so should not be enabled.
+ * doing early preloads. It has not been fully integrated back into the new version so should
+ * not be enabled.
  */
 // #define CHECK_EARLY_PRELOADS
 
@@ -383,7 +382,6 @@ asm_function memcpy_armv5te
     /* The last preload already done is at [r11 - line_size]. */
     /* The next preload in the main loop will happen at [r10]. */
     /* If r11 < r10, we want to do an extra preload at [r11]. */
-#if 1
 18:
     cmp     r11, r10
     add     r11, #64
@@ -420,7 +418,6 @@ asm_function memcpy_armv5te
 .if \overfetch == 0
     b       4f
 .endif
-#endif
 #endif
 .endif
 1:
@@ -768,12 +765,18 @@ asm_function memcpy_armv5te
      */
     cmp     r3, r5
     blt     1f
+#if 1
+    /* Implement catch-up using a simple loop. */
     add     r3, r3, #\line_size
 13:
     cmp     r3, r5
-    pld     [r3]
+    pld     [r3, #-\line_size]
     add     r3, r3, #\line_size
     bge     13b
+#else
+    /* Implement catch-up while processing chunks. To do. */
+13:
+#endif
 .else
     pld     [r3]
 .endif
