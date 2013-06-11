@@ -383,7 +383,7 @@ asm_function memcpy_armv5te
     /* The last preload already done is at [r11 - line_size]. */
     /* The next preload in the main loop will happen at [r10]. */
     /* If r11 < r10, we want to do an extra preload at [r11]. */
-#if 0
+#if 1
 18:
     cmp     r11, r10
     add     r11, #64
