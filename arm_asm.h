@@ -99,6 +99,9 @@ extern void *memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload
 extern void *memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_320(void *dest,
     const void *src, int n);
 
+extern void *memcpy_armv5te_no_overfetch_line_64_align_64_block_write_32_preload_early_192(void *dest,
+    const void *src, int n);
+
 extern void *memcpy_armv5te_no_overfetch_line_64_align_64_block_write_32_preload_early_256(void *dest,
     const void *src, int n);
 

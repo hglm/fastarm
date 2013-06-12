@@ -41,11 +41,11 @@
 
 void *armmem_memcpy(void * restrict s1, const void * restrict s2, size_t n);
 
-#define NU_MEMCPY_VARIANTS 37
+#define NU_MEMCPY_VARIANTS 38
 
 #else
 
-#define NU_MEMCPY_VARIANTS 36
+#define NU_MEMCPY_VARIANTS 37
 
 #endif
 
@@ -93,6 +93,7 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "armv5te non-overfetching memcpy with line size of 64, write alignment of 32 and block write size of 32, preload offset 192 with early preload",
     "armv5te non-overfetching memcpy with line size of 64, write alignment of 32 and block write size of 32, preload offset 256 with early preload",
     "armv5te non-overfetching memcpy with line_size of 64, write alignment of 32 and block write size of 32, preload offset 320 with early preload",
+    "armv5te non-overfetching memcpy with line size of 64, write alignment of 64 and block write size of 32, preload offset 192 with early preload",
     "armv5te non-overfetching memcpy with line size of 64, write alignment of 64 and block write size of 32, preload offset 256 with early preload",
     "armv5te non-overfetching memcpy with line_size of 64, write alignment of 64 and block write size of 32, preload offset 320 with early preload",
     "armv5te overfetching memcpy with write alignment of 16 and block write size of 16, preload offset 128 with early preload",
@@ -135,6 +136,7 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_192,
     memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_256,
     memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_320,
+    memcpy_armv5te_no_overfetch_line_64_align_64_block_write_32_preload_early_192,
     memcpy_armv5te_no_overfetch_line_64_align_64_block_write_32_preload_early_256,
     memcpy_armv5te_no_overfetch_line_64_align_64_block_write_32_preload_early_320,
     memcpy_armv5te_overfetch_align_16_block_write_16_preload_early_128,

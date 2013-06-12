@@ -281,7 +281,8 @@ asm_function memcpy_armv5te
 
 /*
  * CHECK_EARLY_PRELOADS enables checks to avoid overfetching beyond the source region when
- * doing early preloads. Due to the overhead it adds this option may not improve performance.
+ * doing early preloads. This is currently only implemented for the unaligned case.
+ * Due to the overhead it adds this option may not improve performance.
  */
 // #define CHECK_EARLY_PRELOADS
 
@@ -304,7 +305,7 @@ asm_function memcpy_armv5te
     ldr     ip, [r1], #4
 .if \preload_early == 1
 #ifdef CHECK_EARLY_PRELOADS
-.if \overfetch == 0 
+.if \overfetch == 0
     cmp     r6, r7
     /* Only preload if the source region extends into it. */
     blt     5f
@@ -333,20 +334,60 @@ asm_function memcpy_armv5te
 .if \write_align >= 32
     tst     r0, #16
     movne   r3, ip, lsr #(\shift * 8)
-    ldmiane r1!, {r4-r6, ip}
-    subne   r2, r2, #16
-    orrne   r3, r3, r4, asl #(32 - \shift * 8)
-    movne   r4, r4, lsr #(\shift * 8)
-    orrne   r4, r4, r5, asl #(32 - \shift * 8)
-    movne   r5, r5, lsr #(\shift * 8)
-    orrne   r5, r5, r6, asl #(32 - \shift * 8)
-    movne   r6, r6, lsr #(\shift * 8)
-    orrne   r6, r6, ip, asl #(32 - \shift * 8)
-    stmiane r0!, {r3-r6}
+    beq     5f
+    ldmia   r1!, {r4-r6, ip}
+    sub     r2, r2, #16
+    orr     r3, r3, r4, asl #(32 - \shift * 8)
+    mov     r4, r4, lsr #(\shift * 8)
+.if \write_align == 32
+    cmp     r2, #32
+.endif
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, ip, asl #(32 - \shift * 8)
+    stmia   r0!, {r3-r6}
+.if \write_align == 32
+    blt     3f
+    b       1f
+.endif
+5:
+.endif
+
+.if \write_align == 64
+    tst     r0, #32
+    movne   r3, ip, lsr #(\shift * 8)
+    beq     5f
+    ldmia   r1!, {r4-r6, ip}
+    sub     r2, r2, #32
+    orr     r3, r3, r4, asl #(32 - \shift * 8)
+    mov     r4, r4, lsr #(\shift * 8)
+    cmp     r2, #32
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, ip, asl #(32 - \shift * 8)
+    stmia   r0!, {r3-r6}
+    mov     r3, ip, lsr #(\shift * 8)
+    ldmia   r1!, {r4-r6, ip}
+    orr     r3, r3, r4, asl #(32 - \shift * 8)
+    mov     r4, r4, lsr #(\shift * 8)
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, ip, asl #(32 - \shift * 8)
+    stmia   r0!, {r3-r6}
+    blt     3f
+    b       1f
+5:
 .endif
 
     cmp     r2, #32
     blt     3f
+1:
 .if \preload_offset != 0
 .if \overfetch == 1
     cmp     r2, #64
@@ -461,6 +502,79 @@ asm_function memcpy_armv5te
 #endif
 .endif
 1:
+.if \line_size == 64 || \write_align == 64
+    /* Process 64 bytes at a time. */
+.if \overfetch == 1
+    cmp     r2, #(64 + 64)
+.else
+    cmp     r2, #(\preload_offset + 64)
+.endif
+    pld     [r1, r9]
+    mov     r3, ip, lsr #(\shift * 8)
+    ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
+    orr     r3, r3, r4, asl #(32 - \shift * 8)
+    mov     r4, r4, lsr #(\shift * 8)
+    sub     r2, r2, #32
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, r7, asl #(32 - \shift * 8)
+    mov     r7, r7, lsr #(\shift * 8)
+.if \block_write_size == 16
+    stmia   r0!, {r3-r6}
+.endif
+    orr     r7, r7, r8, asl #(32 - \shift * 8)
+    mov     r8, r8, lsr #(\shift * 8)
+    orr     r8, r8, r10, asl #(32 - \shift * 8)
+    mov     r10, r10, lsr #(\shift * 8)
+.if \block_write_size == 8
+    stmia   r0!, {r7-r8}
+.endif
+    orr     r10, r10, r11, asl #(32 - \shift * 8)
+    mov     r11, r11, lsr #(\shift * 8)
+    orr     r11, r11, ip, asl #(32 - \shift * 8)
+.if \block_write_size == 32
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+.endif
+.if \block_write_size == 16
+    stmia   r0!, {r7, r8, r10, r11}
+.endif
+.if \line_size == 32
+    pld     [r1, r9]
+.endif
+    mov     r3, ip, lsr #(\shift * 8)
+    ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
+    orr     r3, r3, r4, asl #(32 - \shift * 8)
+    mov     r4, r4, lsr #(\shift * 8)
+    sub     r2, r2, #32
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, r7, asl #(32 - \shift * 8)
+    mov     r7, r7, lsr #(\shift * 8)
+.if \block_write_size == 16
+    stmia   r0!, {r3-r6}
+.endif
+    orr     r7, r7, r8, asl #(32 - \shift * 8)
+    mov     r8, r8, lsr #(\shift * 8)
+    orr     r8, r8, r10, asl #(32 - \shift * 8)
+    mov     r10, r10, lsr #(\shift * 8)
+.if \block_write_size == 8
+    stmia   r0!, {r7-r8}
+.endif
+    orr     r10, r10, r11, asl #(32 - \shift * 8)
+    mov     r11, r11, lsr #(\shift * 8)
+    orr     r11, r11, ip, asl #(32 - \shift * 8)
+.if \block_write_size == 32
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+.endif
+.if \block_write_size == 16
+    stmia   r0!, {r7, r8, r10, r11}
+.endif
+.else
+    /* Process 32 bytes at a time. */
 .if \overfetch == 1
     cmp     r2, #(32 + 32)
 .else
@@ -505,6 +619,7 @@ asm_function memcpy_armv5te
 .endif
 .if \block_write_size == 8
     stmia   r0!, {r10-r11}
+.endif
 .endif
     bge     1b
 .endif /* preload_offset != 0 */
@@ -613,8 +728,10 @@ asm_function memcpy_armv5te
  * preload_early must be 0 or 1.
  * overfetch must be 0 or 1.
  *
- * If line_size is 64, write_align must be 64, block_write_size must be 32, and preload_offset
+ * If line_size is 64, write_align must be 32 or 64, block_write_size must be 32, and preload_offset
  * must be a multiple of 64.
+ *
+ * If line_size is 64 or write_align is 64, overfetch must be 0.
  */
 
 .macro MEMCPY_VARIANT line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
@@ -682,7 +799,7 @@ asm_function memcpy_armv5te
     ldmiane r1!, {r4, r5}
     subne   r2, r2, #8
     stmiane r0!, {r4, r5}
-.if \write_align == 32 || \write_align == 64
+.if \write_align >= 32
     tst     r0, #16
     ldmiane r1!, {r4-r7}
     subne   r2, r2, #16
@@ -1243,6 +1360,10 @@ asm_function memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload
 
 asm_function memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_320
     MEMCPY_VARIANT 64, 32, 32, 320, 1, 0
+.endfunc
+
+asm_function memcpy_armv5te_no_overfetch_line_64_align_64_block_write_32_preload_early_192
+    MEMCPY_VARIANT 64, 64, 32, 192, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_no_overfetch_line_64_align_64_block_write_32_preload_early_256
