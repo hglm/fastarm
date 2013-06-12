@@ -934,8 +934,8 @@ asm_function memcpy_armv5te
     /*
      * Implement catch-up while processing chunks. block_write_size of 32
      * uses 16-byte writes because of a lack of registers.
-     * Note: if line_size is 64 and write alignment is 64, write alignment
-     * may become unaligned.
+     * Note: if line_size is 64 and write alignment is 64, we have to be 
+     * careful that write alignment remains 64 bytes.
      */
     pld     [r3]
     add     r3, r3, #\line_size
@@ -958,10 +958,38 @@ asm_function memcpy_armv5te
 .endif
     stmia   r0!, {r7, r8, r10, r11}
     sub     r2, r2, #32
+.if \line_size != 64 || \write_align != 64
     bgt     13b
 .if \overfetch == 0
     b       10f
 .endif
+.else
+    /*
+     * If line_size is 64 and write_align is 64, make sure
+     * the write alignment of 64 maintained.
+     *
+     * Jump if we don't need to do preloads anymore; 64-byte write
+     * alignment is not important in this case.
+     */
+    ble     10f
+    cmp     r3, r5
+    ldmialt r1!, {r7, r8, r10, r11}
+    addlt   r5, r5, #32
+    /* In case of a jump, we will be doing more preloads so we */
+    /* have to ensure 64 bytes write alignment. */
+    bge     5f
+    cmp     r2, #(\preload_offset + 64 + 32)
+    pld     [r3]
+    stmia   r0!, {r7, r8, r10, r11}
+    add     r3, r3, #64
+    ldmia   r1!, {r7, r8, r10, r11}
+    sub     r2, r2, #32
+    stmia   r0!, {r7, r8, r10, r11}
+    bgt     13b
+.if \overfetch == 0
+    b       10f
+.endif
+.endif /* line_size == 64 write_alignment == 64 */
 #endif
 .else
     pld     [r3]
@@ -1080,6 +1108,12 @@ asm_function memcpy_armv5te
     ldmfd   sp!, {r0, r4}
     strbne  r3, [ip], #1
     bx      lr
+5:
+    /* We get in case we need to fix write alignment to 64 bytes. */
+    ldmia   r1!, {r7, r8, r10, r11}
+    sub     r2, r2, #32
+    stmia   r0!, {r7, r8, r10, r11}
+    b       1b
 6:
     tst    r1, #2
     stmfd   sp!, {r7}
