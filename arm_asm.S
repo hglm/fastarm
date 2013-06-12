@@ -28,8 +28,8 @@
  *    macros.
  *    To do: -- Fully implement line_size == 64 and write_align == 64 for unaligned case.
  *
- * On the RPi platform, a good choice is armv5te_no_overfetch_align_16_block_write_16_preload_early_128,
- * closely followed by armv5te_no_overfetch_align_16_block_write_16_preload_early_96. For
+ * On the RPi platform, a good choice is armv5te_no_overfetch_align_16_block_write_16_preload_early_96,
+ * closely followed by armv5te_no_overfetch_align_16_block_write_16_preload_early_128. For
  * CPU-cache based work loads armv5te_no_overfetch_align_16_block_write_16_preload_96 might be
  * a little faster.
  *
@@ -1233,7 +1233,7 @@ asm_function memcpy_armv5te
 #ifdef RPI_BEST_MEMCPY_ONLY
 
 asm_function memcpy_armv5te_no_overfetch
-    MEMCPY_VARIANT 32, 16, 16, 128, 1, 0
+    MEMCPY_VARIANT 32, 16, 16, 96, 1, 0
 .endfunc
 
 asm_function memcpy_armv5te_overfetch
