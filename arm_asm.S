@@ -704,7 +704,9 @@ asm_function memcpy_armv5te
     tst     r2, #2
     ldrbne  r3, [r1], #1
     ldrbne  r4, [r1], #1
+.endif
     ldr     r5, [sp], #4
+.if \granularity <= 2
     strbne  r3, [r0], #1
     strbne  r4, [r0], #1
 .endif
@@ -712,7 +714,9 @@ asm_function memcpy_armv5te
 .if \granularity == 1
     tst     r2, #1
     ldrbne  r3, [r1], #1
+.endif
     ldr     r6, [sp], #4
+.if \granularity == 1
     strbne  r3, [r0], #1
 .endif
 
@@ -767,7 +771,9 @@ asm_function memcpy_armv5te
 .if \granularity <= 2
     tst     r0, #2
     ldrbne  r4, [r1], #1
+.endif
     stmfd   sp!, {r5, r6}
+.if \granularity <= 2
     ldrbne  r5, [r1], #1
     subne   r2, r2, #2
     orrne   r4, r4, r5, asl #8
@@ -1129,13 +1135,17 @@ asm_function memcpy_armv5te
 .if \granularity <= 2
     tst     r2, #2
     ldrhne  r3, [r1], #2
+.endif
     ldmfd   sp!, {r5, r6}
+.if \granularity <= 2
     strhne  r3, [ip], #2
 .endif
 .if \granularity == 1
     tst     r2, #1
     ldrbne  r3, [r1], #1
+.endif
     ldmfd   sp!, {r0, r4}
+.if \granularity == 1
     strbne  r3, [ip], #1
 .endif
     bx      lr
@@ -1218,12 +1228,16 @@ asm_function memcpy_armv5te
     strbne  r3, [r0], #1
     strbne  r4, [r0], #1
 
+.if \granularity == 1
     tst     r2, #1
     mov     ip, r0
     ldrbne  r3, [r1]
     ldr     r0, [sp], #4
     strbne  r3, [ip]
     ldr     r4, [sp], #4
+.else
+    ldmfd   sp!, {r0, r4}
+.endif
     bx      lr
 
 .if \granularity == 1
@@ -1306,7 +1320,9 @@ asm_function memcpy_armv5te
 .if \granularity == 1
     tst    r2, #1
     ldrbne r3, [r1]
+.endif
     ldmfd  sp!, {r0, r4}
+.if \granularity == 1
     strbne r3, [ip]
 .endif
     bx     lr
