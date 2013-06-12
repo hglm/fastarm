@@ -921,7 +921,7 @@ asm_function memcpy_armv5te
      * we want to do preloads for them.
      */
     cmp     r3, r5
-    blt     1f
+    bge     1f
 #if 0
     /* Implement catch-up using a simple loop. */
     add     r3, r3, #\line_size
@@ -929,7 +929,7 @@ asm_function memcpy_armv5te
     cmp     r3, r5
     pld     [r3, #-\line_size]
     add     r3, r3, #\line_size
-    bge     13b
+    blt     13b
 #else
     /*
      * Implement catch-up while processing chunks. block_write_size of 32
@@ -941,9 +941,9 @@ asm_function memcpy_armv5te
     add     r3, r3, #\line_size
 13:
     cmp     r3, r5
-    ldmiage r1!, {r7, r8, r10, r11}
-    addge   r5, #32
-    blt     1f
+    ldmialt r1!, {r7, r8, r10, r11}
+    addlt   r5, r5, #32
+    bge     1f
 .if \line_size == 64 || \write_align == 64
     cmp     r2, #(\preload_offset + 64 + 32)
 .else
