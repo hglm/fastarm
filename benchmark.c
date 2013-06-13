@@ -53,7 +53,8 @@ typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
 memcpy_func_type memcpy_func;
 uint8_t *buffer_alloc, *buffer_chunk, *buffer_page, *buffer_compare;
-int *random_buffer_1024;
+int *random_buffer_1024, *random_buffer_1M, *random_buffer_powers_of_two_up_to_65536_power_law;
+int *random_buffer_up_to_65535_power_law;
 double test_duration = DEFAULT_TEST_DURATION;
 int memcpy_mask[NU_MEMCPY_VARIANTS];
 
@@ -147,6 +148,18 @@ static double get_time() {
    struct timespec ts;
    clock_gettime(CLOCK_REALTIME, &ts);
    return (double)ts.tv_sec + (double)ts.tv_nsec / 1000000000.0;
+}
+
+static void test_mixed_powers_of_two_word_aligned(int i) {
+    memcpy_func(buffer_page + random_buffer_1M[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + 4096 + random_buffer_1M[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        random_buffer_powers_of_two_up_to_65536_power_law[i & (RANDOM_BUFFER_SIZE - 1)]);
+}
+
+static void test_mixed_power_law_unaligned(int i) {
+    memcpy_func(buffer_page + random_buffer_1M[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
+        buffer_page + 4096 + random_buffer_1M[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
+        random_buffer_up_to_65535_power_law[i & (RANDOM_BUFFER_SIZE - 1)]);
 }
 
 static void test_unaligned_random_3(int i) {
@@ -511,7 +524,7 @@ static void do_validation(int repeat) {
     }
 }
 
-#define NU_TESTS 37
+#define NU_TESTS 39
 
 typedef struct {
     const char *name;
@@ -519,7 +532,9 @@ typedef struct {
     int bytes;
 } test_t;
 
-test_t test[NU_TESTS] = {
+static test_t test[NU_TESTS] = {
+    { "Mixed powers of 2 from 16 to 65536 (power law), word aligned", test_mixed_powers_of_two_word_aligned, 32768 },
+    { "Mixed from 16 to 65535 (power law), unaligned", test_mixed_power_law_unaligned, 32768 },
     { "3 bytes randomly aligned", test_unaligned_random_3, 3 },
     { "8 bytes randomly aligned", test_unaligned_random_8, 8 },
     { "17 bytes randomly aligned", test_unaligned_random_17, 17 },
@@ -700,7 +715,25 @@ int main(int argc, char *argv[]) {
     srand(0);
     random_buffer_1024 = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
     for (int i = 0; i < RANDOM_BUFFER_SIZE; i++)
-        random_buffer_1024[i] = rand() % 1023;
+        random_buffer_1024[i] = rand() % 1024;
+    random_buffer_1M = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
+    for (int i = 0; i < RANDOM_BUFFER_SIZE; i++)
+        random_buffer_1M[i] = rand() % (1024 * 1024);
+    random_buffer_powers_of_two_up_to_65536_power_law = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
+    int random_buffer_powers_of_two_up_to_65536_power_law_total_bytes = 0;
+    for (int i = 0; i < RANDOM_BUFFER_SIZE; i++) {
+        random_buffer_powers_of_two_up_to_65536_power_law[i] = 16 << (int)floor(13.0 * pow(1.5, 10.0 * (double)rand() / RAND_MAX) / pow(1.5, 10.0));
+        random_buffer_powers_of_two_up_to_65536_power_law_total_bytes += random_buffer_powers_of_two_up_to_65536_power_law[i];
+    }
+    test[0].bytes = random_buffer_powers_of_two_up_to_65536_power_law_total_bytes / RANDOM_BUFFER_SIZE;
+    random_buffer_up_to_65535_power_law = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
+    int random_buffer_up_to_65535_power_law_total_bytes = 0;
+    for (int i = 0; i < RANDOM_BUFFER_SIZE; i++) {
+        random_buffer_up_to_65535_power_law[i] = 16 + (int)floor(65520.0 * (pow(3.0, 10.0 * (double)rand() / RAND_MAX) - 1.0) / (pow(3.0, 10.0) - 1.0));
+        random_buffer_up_to_65535_power_law_total_bytes += random_buffer_up_to_65535_power_law[i];
+    }
+    test[1].bytes = random_buffer_up_to_65535_power_law_total_bytes / RANDOM_BUFFER_SIZE;
+
 
     if (sizeof(size_t) != sizeof(int)) {
         printf("sizeof(size_t) != sizeof(int), unable to directly replace memcpy.\n");

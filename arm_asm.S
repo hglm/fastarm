@@ -37,7 +37,7 @@
  * memcpy_armv5te_no_overfetch_line_64_align_32_block_write_32_preload_early_192, seems to be the
  * best performer.
  *
- * On the Allwinner plaform, the optimized memcpy is faster; on the RPi libcofi does relatively well
+ * On the Allwinner platform, the optimized memcpy is faster; on the RPi libcofi does relatively well
  * and the optimal memcpy depends on the application.
  */
 
