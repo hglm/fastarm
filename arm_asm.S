@@ -69,6 +69,8 @@
 
 /******************************************************************************/
 
+#if !defined(MEMCPY_REPLACEMENT_SUNXI) && !defined(MEMCPY_REPLACEMENT_RPI)
+
 /*
  * Helper macro for memcpy function, it can copy data from source (r1) to 
  * destination (r0) buffers fixing alignment in the process. Destination
@@ -270,6 +272,8 @@ asm_function memcpy_armv5te
     strbgt r3, [ip], #1
     bx     lr
 .endfunc
+
+#endif
 
 /*
  * PRELOAD_CATCH_UP enables catching up the early preload offset with the preload offset in
@@ -1328,7 +1332,33 @@ asm_function memcpy_armv5te
     bx     lr
 .endm
 
+#if defined(MEMCPY_REPLACEMENT_SUNXI) || defined(MEMCPY_REPLACEMENT_RPI)
+
+#ifdef MEMCPY_REPLACEMENT_SUNXI
+
+/* memcpy replacement for the Allwinner platform. */
+
+asm_function memcpy
+    MEMCPY_VARIANT 1, 64, 32, 32, 192, 1, 0
+.endfunc
+
+#endif
+
+#ifdef MEMCPY_REPLACEMENT_RPI
+
+/* memcpy replacement for the RPi platform. */
+
+asm_function memcpy
+    MEMCPY_VARIANT 1, 32, 16, 16, 96, 1, 0
+.endfunc
+
+#endif
+
+#else
+
 #ifdef RPI_BEST_MEMCPY_ONLY
+
+/* Optimized memcpy variants for the RPi platform . */
 
 asm_function memcpy_armv5te_no_overfetch
     MEMCPY_VARIANT 1, 32, 16, 16, 96, 1, 0
@@ -1355,6 +1385,8 @@ asm_function memcpy_words_armv5te_overfetch
 .endfunc
 
 #else
+
+/* A large set of memcpy variants, used in the benchmark program */
 
 asm_function memcpy_armv5te_no_overfetch_align_16_block_write_8_preload_96
     MEMCPY_VARIANT 1, 32, 16, 8, 96, 0, 0
@@ -1497,6 +1529,8 @@ asm_function memcpy_armv5te_overfetch_align_16_block_write_16_preload_early_128
 asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
     MEMCPY_VARIANT 1, 32, 32, 32, 192, 1, 1
 .endfunc
+
+#endif
 
 #endif
 
