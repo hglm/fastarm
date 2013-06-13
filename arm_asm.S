@@ -489,14 +489,14 @@ asm_function memcpy_armv5te
     stmia   r0!, {r3-r6}
     mov     r3, r7
     ldmia   r1!, {r4, r5, r6, ip}
-.if \line_size == 32
-    pld     [r11, #-32]
-.endif
     orr     r3, r3, r4, asl #(32 - \shift * 8)
     add     r10, r1, r9
     mov     r4, r4, lsr #(\shift * 8)
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
+.if \line_size == 32
+    pld     [r11, #-32]
+.endif
     orr     r5, r5, r6, asl #(32 - \shift * 8)
     mov     r6, r6, lsr #(\shift * 8)
     orr     r6, r6, ip, asl #(32 - \shift * 8)
@@ -986,15 +986,15 @@ asm_function memcpy_armv5te
 .else
     cmp     r2, #(\preload_offset + 32 + 32)
 .endif
-    pld     [r3]
     stmia   r0!, {r7, r8, r10, r11}
+    pld     [r3]
     add     r3, r3, #64
     ldmia   r1!, {r7, r8, r10, r11}
+    sub     r2, r2, #32
+    stmia   r0!, {r7, r8, r10, r11}
 .if \line_size == 32
     pld     [r3, #-\line_size]
 .endif
-    stmia   r0!, {r7, r8, r10, r11}
-    sub     r2, r2, #32
 .if \line_size != 64 || \write_align != 64
     bgt     13b
 .if \overfetch == 0
@@ -1016,8 +1016,8 @@ asm_function memcpy_armv5te
     /* have to ensure 64 bytes write alignment. */
     bge     5f
     cmp     r2, #(\preload_offset + 64 + 32)
-    pld     [r3]
     stmia   r0!, {r7, r8, r10, r11}
+    pld     [r3]
     add     r3, r3, #64
     ldmia   r1!, {r7, r8, r10, r11}
     sub     r2, r2, #32
@@ -1041,14 +1041,14 @@ asm_function memcpy_armv5te
     cmp     r2, #(\preload_offset + 64 + 64)
 .endif
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
 .if \line_size == 32
     pld     [r1, r9]
 .endif
+    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     sub     r2, r2, #64
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
-    ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     pld     [r1, r9]
-    stmia   r0!, {r3-r6, r7, r8, r10, r11}
 .else
 .if \overfetch == 1
     cmp     r2, #(32 + 32)
@@ -1058,14 +1058,14 @@ asm_function memcpy_armv5te
 .if \block_write_size == 32
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     sub     r2, r2, #32
-    pld     [r1, r9]
     stmia   r0!, {r3-r6, r7, r8, r10, r11}
+    pld     [r1, r9]
 .endif
 .if \block_write_size == 16
     ldmia   r1!, {r3-r6, r7, r8, r10, r11}
     sub     r2, r2, #32
-    pld     [r1, r9]
     stmia   r0!, {r3-r6}
+    pld     [r1, r9]
     stmia   r0!, {r7, r8, r10, r11}
 .endif
 .if \block_write_size == 8
