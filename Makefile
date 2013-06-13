@@ -7,7 +7,7 @@ BENCHMARK_CONFIG_FLAGS = # -DINCLUDE_LIBARMMEM_MEMCPY
 CFLAGS = -std=gnu99 -Ofast -Wall $(BENCHMARK_CONFIG_FLAGS)
 PCFLAGS = -std=gnu99 -O -Wall $(BENCHMARK_CONFIG_FLAGS) -pg -ggdb
 
-all : benchmark
+all : benchmark libfastarm.so
 
 benchmark : benchmark.o arm_asm.o
 	$(CC) $(CFLAGS) benchmark.o arm_asm.o -o benchmark -lm -lrt $(LIBARMMEM)
@@ -24,7 +24,7 @@ install_memcpy_replacement : libfastarm.so
 	@echo 'out or deleted.'
 
 libfastarm.so : memcpy_replacement.o
-	$(CC) -o libfastarm.so -shared memcpy_replacement.o -g
+	$(CC) -o libfastarm.so -shared memcpy_replacement.o
 
 memcpy_replacement.o : arm_asm.S
 	$(CC) -c -s -x assembler-with-cpp -DMEMCPY_REPLACEMENT_$(PLATFORM) -o memcpy_replacement.o arm_asm.S

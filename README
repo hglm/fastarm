@@ -27,7 +27,12 @@ the file /etc/ld.so.preload so that it contains the line:
     /usr/lib/arm-linux-gnueabihf/libfastarm.so
 
 On the RPi platform, references to libcofi_rpi.so should be commented out
-or deleted. To revert to the default optimized memcpy on the RPi platform,
+or deleted. The new memcpy should now be activated for newly launched
+programs. To be sure, reboot or run:
+
+    sudo ldconfig
+
+To revert to the default optimized memcpy on the RPi platform,
 edit /etc/ld.so.preload so that it contains the line:
 
     /usr/lib/arm-linux-gnueabihf/libcofi_rpi.so
