@@ -521,12 +521,15 @@ static void do_validation(int repeat) {
             dest = rand() % (1024 * 1024 * 16 + 1 - size);
         }
         while (dest + size > source && dest < source + size);
+        printf("Testing (source offset = 0x%08X, destination offset = 0x%08X, size = %d).\n",
+                source, dest, size);
+        fflush(stdout);
         fill_buffer(buffer_compare);
         memcpy_emulate(buffer_compare + dest, buffer_compare + source, size);
         fill_buffer(buffer_alloc);
         memcpy_func(buffer_alloc + dest, buffer_alloc + source, size);
         if (!compare_buffers(buffer_alloc, buffer_compare)) {
-            printf("Validation failed (source offset = 0x%08X, destination offset = 0x%08X, size = %d.\n",
+            printf("Validation failed (source offset = 0x%08X, destination offset = 0x%08X, size = %d).\n",
                 source, dest, size);
             passed = 0;
         }

@@ -757,14 +757,46 @@ asm_function memcpy_armv5te
 .if \preload_early == 1
     pld     [r3]
 .endif
-    stmfd   sp!, {r0, r4}
-    /* Get out if there are less than write_align + 4 bytes to go. */
-.if \granularity == 4
-    blt     22f
-.else
-    blt     9f
+    /* Jump if there are >= write_align + 4 bytes. */
+    bge     1f
+
+.if \granularity <= 2
+    /*
+     * Small sizes. Test whether both source and destination are word aligned.
+     */
+    tst    r0, #3
+    andseq r3, r1, #3
+    /* If not, jump to the unaligned code for small sizes */
+    bne    9f
 .endif
+    mov    ip, r0
+
+    /* Copy words. Fast path for small sizes with word aligned src and dest. */
+    /* ip must be equal to the original r0. */
+22:
+    subs   r2, r2, #4
+    ldrge  r3, [r1], #4
+    strge  r3, [r0], #4
+    bge    22b
+.if \granularity <= 2
+    tst    r2, #2
+    ldrhne r3, [r1], #2
+    strhne r3, [r0], #2
+.endif
+.if \granularity == 1
+    tst    r2, #1
+    ldrbne r3, [r1]
+.endif
+.if \granularity == 1
+    strbne r3, [r0]
+.endif
+    mov    r0, ip
+    bx     lr
+
+1:
+    /* Larger sizes. */
     /* copy data until destination address is 4 bytes aligned */
+    stmfd   sp!, {r0, r4}
 .if \granularity == 1
     tst     r0, #1
     ldrbne  r4, [r1], #1
@@ -1177,40 +1209,35 @@ asm_function memcpy_armv5te
     .p2align 4
 .if \granularity <= 2
 9:
-    /*
-     * Small sizes. Test whether both source and destination are word aligned.
-     */
-    tst    r0, #3
-    andseq r3, r1, #3
-    beq    22f
-
+    push    {r0}
     /* copy data until destination address is 4 bytes aligned */
 .if \granularity == 1
     teq     r2, #0            /* Set eq if there is less than one byte left. */
     tstne   r0, #1
-    ldrbne  r4, [r1], #1
+    ldrbne  r3, [r1], #1
     subne   r2, r2, #1
-    strbne  r4, [r0], #1
+    strbne  r3, [r0], #1
 .endif
 
-    bics    r4, r2, #1        /* Set eq if there are less than two bytes left. */
+    bics    r3, r2, #1        /* Set eq if there are less than two bytes left. */
     tstne   r0, #2
-    ldrbne  r4, [r1], #1
+    ldrbne  r3, [r1], #1
     ldrbne  ip, [r1], #1
     subne   r2, r2, #2
-    orrne   r4, r4, ip, asl #8
-    strhne  r4, [r0], #2
+    orrne   r3, r3, ip, asl #8
+    strhne  r3, [r0], #2
     /* destination address is 4 bytes aligned */
 
     /* now we should handle four cases of source address alignment */
 .if \granularity == 1
-    bics    r4, r2, #3        /* Set eq if there are less than four bytes left. */
+    bics    r3, r2, #3        /* Set eq if there are less than four bytes left. */
     tstne   r1, #1
     bne     25f
 .endif
-    bics    r4, r2, #3        /* Set eq if there are less than four bytes left. */
+    bics    r3, r2, #3        /* Set eq if there are less than four bytes left. */
     tstne   r1, #2
-    beq     22f               /* Jump if the source is word aligned, or there are < 4 bytes. */
+    popeq   {ip}
+    beq     22b               /* Jump if the source is word aligned, or there are < 4 bytes. */
 
     /* shift 2 */
 //    sub     r1, r1, #2
@@ -1228,9 +1255,9 @@ asm_function memcpy_armv5te
     sub     r1, r1, #2
     tst     r2, #2
     ldrbne  r3, [r1], #1
-    ldrbne  r4, [r1], #1
+    ldrbne  ip, [r1], #1
     strbne  r3, [r0], #1
-    strbne  r4, [r0], #1
+    strbne  ip, [r0], #1
 
 .if \granularity == 1
     tst     r2, #1
@@ -1238,9 +1265,8 @@ asm_function memcpy_armv5te
     ldrbne  r3, [r1]
     ldr     r0, [sp], #4
     strbne  r3, [ip]
-    ldr     r4, [sp], #4
 .else
-    ldmfd   sp!, {r0, r4}
+    pop     {r0}
 .endif
     bx      lr
 
@@ -1262,16 +1288,15 @@ asm_function memcpy_armv5te
     sub     r1, r1, #3
     tst     r2, #2
     ldrbne  r3, [r1], #1
-    ldrbne  r4, [r1], #1
+    ldrbne  ip, [r1], #1
     strbne  r3, [r0], #1
-    strbne  r4, [r0], #1
+    strbne  ip, [r0], #1
 
     tst     r2, #1
     mov     ip, r0
     ldrbne  r3, [r1]
     ldr     r0, [sp], #4
-    strbne   r3, [ip]
-    ldr     r4, [sp], #4
+    strbne  r3, [ip]
     bx      lr
 
 25:
@@ -1295,41 +1320,19 @@ asm_function memcpy_armv5te
     sub     r1, r1, #1
     tst     r2, #2
     ldrbne  r3, [r1], #1
-    ldrbne  r4, [r1], #1
+    ldrbne  ip, [r1], #1
     strbne  r3, [r0], #1
-    strbne  r4, [r0], #1
+    strbne  ip, [r0], #1
 
     tst     r2, #1
     mov     ip, r0
     ldrbne  r3, [r1]
     ldr     r0, [sp], #4
     strbne  r3, [ip]
-    ldr     r4, [sp], #4
     bx      lr
 .endif /* granularity == 1 */
 .endif /* granularity <= 2 */
 
-    /* Copy words. */
-22:
-    subs   r2, r2, #4
-    ldrge  r3, [r1], #4
-    strge  r3, [r0], #4
-    bge    22b
-.if \granularity <= 2
-    tst    r2, #2
-    mov    ip, r0
-    ldrhne r3, [r1], #2
-    strhne r3, [ip], #2
-.endif
-.if \granularity == 1
-    tst    r2, #1
-    ldrbne r3, [r1]
-.endif
-    ldmfd  sp!, {r0, r4}
-.if \granularity == 1
-    strbne r3, [ip]
-.endif
-    bx     lr
 .endm
 
 #if defined(MEMCPY_REPLACEMENT_SUNXI) || defined(MEMCPY_REPLACEMENT_RPI)
