@@ -753,22 +753,8 @@ asm_function memcpy_armv5te
  */
 
 .macro MEMCPY_VARIANT granularity, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
-.if \write_align <= 32
-    /*
-     * If source and destination have the same alignment with a word,
-     * the small size threshold is 68; otherwise, it is 36.
-     * If write_align is 64, it is always 68.
-     */
-    eor     r3, r0, r1
-    mov     ip, #68
-    tst     r3, #3
-    movne   ip, #36
+    cmp     r2, #52
     bic     r3, r1, #(\line_size - 1)
-    cmp     r2, ip
- .else
-    cmp     r2, #(\write_align + 4)
-    bic     r3, r1, #(\line_size - 1)
-.endif
 .if \preload_early == 1
     pld     [r3]
 .endif
@@ -789,7 +775,6 @@ asm_function memcpy_armv5te
     /* Copy words. Fast path for small sizes with word aligned src and dest. */
     /* ip must be equal to the original r0. */
 29:
-#if 1
 22:
     subs   r2, r2, #8
     ldrge  r3, [r1], #4
@@ -800,13 +785,6 @@ asm_function memcpy_armv5te
     tst    r2, #4
     ldrne  r3, [r1], #4
     strne  r3, [r0], #4
-#else
-2:
-    subs   r2, r2, #4
-    ldrge  r3, [r1], #4
-    strge  r3, [r0], #4
-    bge    2b
-#endif
 .if \granularity <= 2
     tst    r2, #2
     ldrhne r3, [r1], #2
@@ -815,8 +793,6 @@ asm_function memcpy_armv5te
 .if \granularity == 1
     tst    r2, #1
     ldrbne r3, [r1]
-.endif
-.if \granularity == 1
     strbne r3, [r0]
 .endif
     mov    r0, ip
