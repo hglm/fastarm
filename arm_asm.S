@@ -678,17 +678,18 @@ asm_function memcpy_armv5te
 3:  /* copy remaining data */
     tst     r2, #16
     ldmfd   sp!, {r7}
-    movne   r3, ip, lsr #(\shift * 8)
-    ldmiane r1!, {r4-r6, ip}
-    orrne   r3, r3, r4, asl #(32 - \shift * 8)
-    movne   r4, r4, lsr #(\shift * 8)
-    orrne   r4, r4, r5, asl #(32 - \shift * 8)
-    movge   r5, r5, lsr #(\shift * 8)
-    orrge   r5, r5, r6, asl #(32 - \shift * 8)
-    movge   r6, r6, lsr #(\shift * 8)
-    orrge   r6, r6, ip, asl #(32 - \shift * 8)
-    stmiane r0!, {r3-r6}
-
+    mov     r3, ip, lsr #(\shift * 8)
+    beq     1f
+    ldmia   r1!, {r4-r6, ip}
+    orr     r3, r3, r4, asl #(32 - \shift * 8)
+    mov     r4, r4, lsr #(\shift * 8)
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, ip, asl #(32 - \shift * 8)
+    stmia   r0!, {r3-r6}
+1:
     tst     r2, #8
     movne   r3, ip, lsr #(\shift * 8)
     ldmiane r1!, {r4, ip}
@@ -752,12 +753,26 @@ asm_function memcpy_armv5te
  */
 
 .macro MEMCPY_VARIANT granularity, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
+.if \write_align <= 32
+    /*
+     * If source and destination have the same alignment with a word,
+     * the small size threshold is 68; otherwise, it is 36.
+     * If write_align is 64, it is always 68.
+     */
+    eor     r3, r0, r1
+    mov     ip, #68
+    tst     r3, #3
+    movne   ip, #36
+    bic     r3, r1, #(\line_size - 1)
+    cmp     r2, ip
+ .else
     cmp     r2, #(\write_align + 4)
     bic     r3, r1, #(\line_size - 1)
+.endif
 .if \preload_early == 1
     pld     [r3]
 .endif
-    /* Jump if there are >= write_align + 4 bytes. */
+    /* Jump if we have a large size. */
     bge     1f
 
 .if \granularity <= 2
@@ -773,11 +788,25 @@ asm_function memcpy_armv5te
 
     /* Copy words. Fast path for small sizes with word aligned src and dest. */
     /* ip must be equal to the original r0. */
+29:
+#if 1
 22:
-    subs   r2, r2, #4
+    subs   r2, r2, #8
+    ldrge  r3, [r1], #4
+    strge  r3, [r0], #4
     ldrge  r3, [r1], #4
     strge  r3, [r0], #4
     bge    22b
+    tst    r2, #4
+    ldrne  r3, [r1], #4
+    strne  r3, [r0], #4
+#else
+2:
+    subs   r2, r2, #4
+    ldrge  r3, [r1], #4
+    strge  r3, [r0], #4
+    bge    2b
+#endif
 .if \granularity <= 2
     tst    r2, #2
     ldrhne r3, [r1], #2
@@ -1209,18 +1238,19 @@ asm_function memcpy_armv5te
     .p2align 4
 .if \granularity <= 2
 9:
+    cmp     r2, #8
     push    {r0}
+    blt     1f               /* Jump to special case for really small sizes. */
+    
     /* copy data until destination address is 4 bytes aligned */
 .if \granularity == 1
-    teq     r2, #0            /* Set eq if there is less than one byte left. */
-    tstne   r0, #1
+    tst     r0, #1
     ldrbne  r3, [r1], #1
     subne   r2, r2, #1
     strbne  r3, [r0], #1
 .endif
 
-    bics    r3, r2, #1        /* Set eq if there are less than two bytes left. */
-    tstne   r0, #2
+    tst     r0, #2
     ldrbne  r3, [r1], #1
     ldrbne  ip, [r1], #1
     subne   r2, r2, #2
@@ -1230,14 +1260,12 @@ asm_function memcpy_armv5te
 
     /* now we should handle four cases of source address alignment */
 .if \granularity == 1
-    bics    r3, r2, #3        /* Set eq if there are less than four bytes left. */
-    tstne   r1, #1
+    tst     r1, #1
     bne     25f
 .endif
-    bics    r3, r2, #3        /* Set eq if there are less than four bytes left. */
-    tstne   r1, #2
+    tst     r1, #2
     popeq   {ip}
-    beq     22b               /* Jump if the source is word aligned, or there are < 4 bytes. */
+    beq     29b               /* Jump if the source is word aligned. */
 
     /* shift 2 */
 //    sub     r1, r1, #2
@@ -1267,6 +1295,44 @@ asm_function memcpy_armv5te
     strbne  r3, [ip]
 .else
     pop     {r0}
+.endif
+    bx      lr
+
+    /* Handle sizes < 8 */
+1:
+.if \granularity == 2
+    tst     r2, #4
+    ldrhne  r3, [r1], #2
+    ldrhne  ip, [r1], #2
+    strhne  r3, [r0], #2
+    strhne  ip, [r0], #2
+    test    r2, #2
+    mov     ip, r0
+    ldrhne  r3, [r1]
+    pop     {r0}
+    strhne  r3, [ip]
+.else
+    tst     r2, #4
+    ldrbne  r3, [r1], #1
+    beq     2f
+    ldrb    ip, [r1], #1
+    strb    r3, [r0], #1
+    strb    ip, [r0], #1
+    ldrb    r3, [r1], #1
+    ldrb    ip, [r1], #1
+    strb    r3, [r0], #1
+    strb    ip, [r0], #1
+2:
+    tst     r2, #2
+    ldrbne  r3, [r1], #1
+    ldrbne  ip, [r1], #1
+    strbne  r3, [r0], #1
+    strbne  ip, [r0], #1
+    tst     r2, #1
+    mov     ip, r0
+    ldrbne  r3, [r1]
+    pop     {r0}
+    strbne  r3, [ip]
 .endif
     bx      lr
 

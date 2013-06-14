@@ -204,6 +204,12 @@ static void test_unaligned_random_64(int i) {
         64);
 }
 
+static void test_aligned_64(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        64);
+}
+
 static void test_unaligned_random_137(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
         buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
@@ -539,7 +545,7 @@ static void do_validation(int repeat) {
     }
 }
 
-#define NU_TESTS 41
+#define NU_TESTS 42
 
 typedef struct {
     const char *name;
@@ -557,6 +563,7 @@ static test_t test[NU_TESTS] = {
     { "30 bytes randomly aligned", test_unaligned_random_30, 30 },
     { "30 bytes word aligned", test_aligned_30, 30 },
     { "64 bytes randomly aligned", test_unaligned_random_64, 64 },
+    { "64 bytes word aligned", test_aligned_64, 64 },
     { "137 bytes randomly aligned", test_unaligned_random_137, 137 },
     { "1024 bytes randomly aligned", test_unaligned_random_1024, 1024 },
     { "32768 bytes randomly aligned", test_unaligned_random_32768, 32768 },
