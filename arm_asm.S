@@ -1437,6 +1437,141 @@ asm_function memcpy_armv5te
 
 .endm
 
+/*
+ * The following function implement a simpler memcpy that is optimized with a fast path
+ * for common cases and may use unaligned access for small sizes.
+ */
+
+.macro MEMCPY_VARIANT_SIMPLE_WRITE_ALIGN write_align
+    /* Align to a 16-byte or 32-byte boundary. */
+    tst     r0, #4
+    ldrne   r3, [r1], #4
+    subne   r2, r2, #4
+    strne   r3, [r0], #4
+    tst     r0, #8
+    ldrne   r3, [r1], #4
+    ldrne   ip, [r1], #4
+    subne   r2, r2, #8
+    strne   r3, [r0], #4
+    strne   ip, [r0], #4
+.if \write_align == 32
+    tst     r0, #16
+    ldrne   r3, [r1]
+    beq     11f
+    ldr     ip, [r1, #4]
+    str     r3, [r0]
+    sub     r2, r2, #16
+    str     ip, [r0, #4]
+    ldr     r3, [r1, #8]
+    ldr     ip, [r1, #12]
+    str     r3, [r0, #8]
+    str     ip, [r0, #12]
+    add     r1, #16
+    add     r0, #16
+11:
+.endif
+.endm
+
+.macro MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART shift, line_size, write_align, block_write_size, preload_offset
+    ldr     ip, [r1, #(-\shift)]
+    add     r1, r1, #(4 - \shift)
+
+    tst     r0, #4
+    push    {r4-r6}
+    movne   r3, ip, lsr #(\shift * 8)
+    ldrne   ip, [r1], #4
+    subne   r2, r2, #4
+    orrne   r3, r3, ip, asl #(32 - \shift * 8)
+    strne   r3, [r0], #4
+
+    tst     r0, #8
+    movne   r3, ip, lsr #(\shift * 8)
+    ldmiane r1!, {r4, ip}
+    subne   r2, r2, #8
+    orrne   r3, r3, r4, asl #(32 - \shift * 8)
+    movne   r4, r4, lsr #(\shift * 8)
+    orrne   r4, r4, ip, asl #(32 - \shift * 8)
+    stmiane r0!, {r3-r4}
+
+.if \write_align == 32
+    tst     r0, #16
+    movne   r3, ip, lsr #(\shift * 8)
+    beq     25f
+    ldmia   r1!, {r4-r6, ip}
+    sub     r2, r2, #16
+    orr     r3, r3, r4, asl #(32 - \shift * 8)
+    mov     r4, r4, lsr #(\shift * 8)
+    cmp     r2, #32
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, ip, asl #(32 - \shift * 8)
+    stmia   r0!, {r3-r6}
+25:
+.else
+    cmp     r2, #32    
+.endif
+
+    blt     22f
+
+    add     r3, r1, #\preload_offset
+    push    {r7-r11}
+    bic     r3, r3, #(\line_size - 1)
+    sub     r2, r2, #32
+    sub     r9, r3, r1
+    /*
+     * Main loop for unaligned copy. Process 32 bytes at a time.
+     */
+21:
+    pld     [r1, r9]
+    mov     r3, ip, lsr #(\shift * 8)
+    ldmia   r1!, {r4-r6, r7, r8, r10, r11, ip}
+    orr     r3, r3, r4, asl #(32 - \shift * 8)
+    mov     r4, r4, lsr #(\shift * 8)
+    subs    r2, r2, #32
+    orr     r4, r4, r5, asl #(32 - \shift * 8)
+    mov     r5, r5, lsr #(\shift * 8)
+    orr     r5, r5, r6, asl #(32 - \shift * 8)
+    mov     r6, r6, lsr #(\shift * 8)
+    orr     r6, r6, r7, asl #(32 - \shift * 8)
+    mov     r7, r7, lsr #(\shift * 8)
+.if \block_write_size == 16
+    stmia   r0!, {r3-r6}
+.endif
+    orr     r7, r7, r8, asl #(32 - \shift * 8)
+    mov     r8, r8, lsr #(\shift * 8)
+    orr     r8, r8, r10, asl #(32 - \shift * 8)
+    mov     r10, r10, lsr #(\shift * 8)
+    orr     r10, r10, r11, asl #(32 - \shift * 8)
+    mov     r11, r11, lsr #(\shift * 8)
+    orr     r11, r11, ip, asl #(32 - \shift * 8)
+.if \block_write_size == 32
+    stmia   r0!, {r3-r6, r7, r8, r10, r11}
+.endif
+.if \block_write_size == 16
+    stmia   r0!, {r7, r8, r10, r11}
+.endif
+    bge     21b
+    adds    r2, r2, #32
+    pop     {r7-r11}
+    popeq   {r4-r6}
+    popeq   {r0}
+    bxeq    lr
+22:
+    pop     {r4-r6}
+23:
+    subs    r2, r2, #4
+    movge   r3, ip, lsr #(\shift * 8)
+    ldrge   ip, [r1], #4
+    orrge   r3, r3, ip, asl #(32 - \shift * 8)
+    strge   r3, [r0], #4
+    bge     23b
+
+24:
+    sub     r1, r1, #(4 - \shift)
+.endm
+
 .macro MEMCPY_VARIANT_SIMPLE granularity, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
     cmp     r2, #68
     bic     r3, r1, #(\line_size - 1)
@@ -1447,7 +1582,7 @@ asm_function memcpy_armv5te
     bge     1f
 
     /*
-     * Loop for sizes < 64 bytes; don't care about unaligned access.
+     * Loop for sizes < 68 bytes; don't care about unaligned access.
      */
 4:
     cmp    r2, #8
@@ -1483,6 +1618,9 @@ asm_function memcpy_armv5te
     tst     r0, #3
 .endif
     push    {r0}
+.if \granularity == 1
+    tsteq   r1, #3
+.endif
 .if \preload_early == 1
     pld     [r3, #\line_size]
 .endif
@@ -1490,76 +1628,44 @@ asm_function memcpy_armv5te
 .if \granularity <= 2
     bne     3f
 .endif
-
+    
     /* Larger sizes with word aligned source and destination. */
 2:
-    /* Align to a 16-byte or 32-byte boundary. */
-    tst     r0, #4
-    ldrne   r3, [r1], #4
-    subne   r2, r2, #4
-    strne   r3, [r0], #4
-    tst     r0, #8
-    ldrne   r3, [r1], #4
-    ldrne   ip, [r1], #4
-    subne   r2, r2, #8
-    strne   r3, [r0], #4
-    strne   ip, [r0], #4
-.if \write_align == 32
-    tst     r0, #16
-    ldrne   r3, [r1]
-    beq     1f
-    ldr     ip, [r1, #4]
-    str     r3, [r0]
-    sub     r2, r2, #16
-    str     ip, [r0, #4]
-    ldr     r3, [r1, #8]
-    ldr     ip, [r1, #12]
-    str     r3, [r0, #8]
-    str     ip, [r0, #12]
-    add     r1, #16
-    add     r0, #16
-1:
-.endif
+    MEMCPY_VARIANT_SIMPLE_WRITE_ALIGN \write_align
+
     cmp     r2, #32
     pop     {r3}
-.if \block_write_size == 32
     pushge  {r4-r11}
+.if \write_align == \line_size
+    mov     ip, #\preload_offset
+    blt     6f
+    pld     [r3, #(\line_size * 2)]
 .else
-    pushge  {r4-r7}
-.endif
     addge   ip, r1, #\preload_offset
     blt     6f
     bic     ip, ip, #(\line_size - 1)
     pld     [r3, #(\line_size * 2)]
     sub     ip, ip, r1
+.endif
+    sub     r2, r2, #32
 5:
     /*
-     * The mainl loop for large sizes. Copy 32 bytes at a time
+     * The main loop for large sizes. Copy 32 bytes at a time
      * using ldmia/stmia while prefetching a 32-byte aligned
      * address.
      */
-    cmp     r2, #(32 + 32)
-.if \block_write_size == 32
+    pld     [r1, ip]
     ldmia   r1!, {r4-r11}
-.else
-    ldmia   r1!, {r4-r7}
-.endif
-    sub     r2, r2, #32
+    subs    r2, r2, #32
 .if \block_write_size == 32
     stmia   r0!, {r4-r11}
 .else
     stmia   r0!, {r4-r7}
-    ldmia   r1!, {r4-r7}
-    stmia   r0!, {r4-r7}
+    stmia   r0!, {r8-r11}
 .endif
-    pld     [r1, ip]
     bge     5b
-    tst     r2, #31
-.if \block_write_size == 32
+    adds    r2, r2, #32
     pop     {r4-r11}
-.else
-    pop     {r4-r7}
-.endif
     popeq   {r0}
     bxeq    lr
 6:
@@ -1644,20 +1750,8 @@ asm_function memcpy_armv5te
     bne     2f
 .endif
 
-    /* shift 2 */
-//    sub     r1, r1, #2
-//    ldr     ip, [r1], #4
-    ldr     ip, [r1, #-2]
-    add     r1, r1, #2
-1:
-    subs    r2, r2, #4
-    movge   r3, ip, lsr #(2 * 8)
-    ldrge   ip, [r1], #4
-    orrge   r3, r3, ip, asl #(32 - 2 * 8)
-    strge   r3, [r0], #4
-    bge     1b
-
-    sub     r1, r1, #2
+    MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART 2, line_size, write_align, block_write_size, preload_offset
+4:
     tst     r2, #2
     ldrbne  r3, [r1], #1
     ldrbne  ip, [r1], #1
@@ -1677,63 +1771,15 @@ asm_function memcpy_armv5te
 
 .if \granularity == 1
 3:
-    /* Shift 3. */
-//    sub     r1, r1, #3
-//    ldr     ip, [r1], #4
-    ldr     ip, [r1, #-3]
-    add     r1, r1, #1
-1:
-    subs    r2, r2, #4
-    movge   r3, ip, lsr #(3 * 8)
-    ldrge   ip, [r1], #4
-    orrge   r3, r3, ip, asl #(32 - 3 * 8)
-    strge   r3, [r0], #4
-    bge     1b
-
-    sub     r1, r1, #1
-    tst     r2, #2
-    ldrbne  r3, [r1], #1
-    ldrbne  ip, [r1], #1
-    strbne  r3, [r0], #1
-    strbne  ip, [r0], #1
-
-    tst     r2, #1
-    mov     ip, r0
-    ldrbne  r3, [r1]
-    ldr     r0, [sp], #4
-    strbne  r3, [ip]
-    bx      lr
+    MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART 3, line_size, write_align, block_write_size, preload_offset
+    b       4b
 
 2:
     tst     r1, #2
     bne     3b
 
-    /* Shift 1. */
-//    sub     r1, r1, #1
-//    ldr     ip, [r1], #4
-    ldr     ip, [r1, #-1]
-    add     r1, r1, #3
-1:
-    subs    r2, r2, #4
-    movge   r3, ip, lsr #(1 * 8)
-    ldrge   ip, [r1], #4
-    orrge   r3, r3, ip, asl #(32 - 1 * 8)
-    strge   r3, [r0], #4
-    bge     1b
-
-    sub     r1, r1, #3
-    tst     r2, #2
-    ldrbne  r3, [r1], #1
-    ldrbne  ip, [r1], #1
-    strbne  r3, [r0], #1
-    strbne  ip, [r0], #1
-
-    tst     r2, #1
-    mov     ip, r0
-    ldrbne  r3, [r1]
-    ldr     r0, [sp], #4
-    strbne  r3, [ip]
-    bx      lr
+    MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART 1, line_size, write_align, block_write_size, preload_offset
+    b       4b
 .endif
 
 .endif
@@ -1939,7 +1985,7 @@ asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
 .endfunc
 
 asm_function memcpy_simple
-    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 32, 192, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 96, 1, 0
 .endfunc
 
 #endif
