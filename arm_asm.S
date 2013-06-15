@@ -1810,7 +1810,8 @@ asm_function memcpy
 /* memcpy replacement for the RPi platform. */
 
 asm_function memcpy
-    MEMCPY_VARIANT 1, 32, 16, 16, 128, 1, 0
+/*     MEMCPY_VARIANT 1, 32, 16, 16, 128, 1, 0 */
+    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 96, 1, 0
 .endfunc
 
 #endif
