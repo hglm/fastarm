@@ -1508,18 +1508,25 @@ asm_function memcpy_armv5te
     mov     r6, r6, lsr #(\shift * 8)
     orr     r6, r6, ip, asl #(32 - \shift * 8)
     stmia   r0!, {r3-r6}
+    blt     22f
+    b       26f
 25:
-.else
-    cmp     r2, #32    
 .endif
+    cmp     r2, #32    
 
     blt     22f
-
+26:
+.if \write_align == \line_size
+    mov     r9, #\preload_offset
+    push    {r7-r11}
+    sub     r2, r2, #32
+.else
     add     r3, r1, #\preload_offset
     push    {r7-r11}
     bic     r3, r3, #(\line_size - 1)
     sub     r2, r2, #32
     sub     r9, r3, r1
+.endif
     /*
      * Main loop for unaligned copy. Process 32 bytes at a time.
      */
