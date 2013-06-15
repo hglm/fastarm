@@ -212,6 +212,12 @@ static void test_aligned_128(int i) {
         128);
 }
 
+static void test_aligned_256(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        256);
+}
+
 static void test_unaligned_random_17(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
         buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
@@ -571,7 +577,7 @@ static void do_validation(int repeat) {
     }
 }
 
-#define NU_TESTS 46
+#define NU_TESTS 47
 
 typedef struct {
     const char *name;
@@ -588,6 +594,7 @@ static test_t test[NU_TESTS] = {
     { "32 bytes word aligned", test_aligned_32, 32 },
     { "64 bytes word aligned", test_aligned_64, 64 },
     { "128 bytes word aligned", test_aligned_128, 128 },
+    { "256 bytes word aligned", test_aligned_256, 256 },
     { "Mixed from 16 to 65535 (power law), unaligned", test_mixed_power_law_unaligned, 32768 },
     { "3 bytes randomly aligned", test_unaligned_random_3, 3 },
     { "8 bytes randomly aligned", test_unaligned_random_8, 8 },
@@ -786,7 +793,7 @@ int main(int argc, char *argv[]) {
         random_buffer_up_to_65535_power_law[i] = 16 + (int)floor(65520.0 * (pow(3.0, 10.0 * (double)rand() / RAND_MAX) - 1.0) / (pow(3.0, 10.0) - 1.0));
         random_buffer_up_to_65535_power_law_total_bytes += random_buffer_up_to_65535_power_law[i];
     }
-    test[8].bytes = random_buffer_up_to_65535_power_law_total_bytes / RANDOM_BUFFER_SIZE;
+    test[9].bytes = random_buffer_up_to_65535_power_law_total_bytes / RANDOM_BUFFER_SIZE;
 
 
     if (sizeof(size_t) != sizeof(int)) {

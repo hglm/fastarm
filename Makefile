@@ -1,7 +1,7 @@
 # PLATFORM must be SUNXI or RPI and is used to select the memcpy
 # variant used in the memcpy replacement library (libfastarm.so)
 
-PLATFORM = RPI
+PLATFORM = SUNXI
 BENCHMARK_CONFIG_FLAGS = # -DINCLUDE_LIBARMMEM_MEMCPY
 #LIBARMMEM = -larmmem
 CFLAGS = -std=gnu99 -Ofast -Wall $(BENCHMARK_CONFIG_FLAGS)

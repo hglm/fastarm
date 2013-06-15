@@ -1438,8 +1438,11 @@ asm_function memcpy_armv5te
 .endm
 
 /*
- * The following function implement a simpler memcpy that is optimized with a fast path
+ * The following macros implement a simpler memcpy that is optimized with a fast path
  * for common cases and may use unaligned access for small sizes.
+ *
+ * line_size of 64 or 32 is supported, write_align must be 32 or 16, block_write_size
+ * must be 32 or 16, early_preload and overfetch are enabled.
  */
 
 .macro MEMCPY_VARIANT_SIMPLE_WRITE_ALIGN write_align
@@ -1457,7 +1460,7 @@ asm_function memcpy_armv5te
 .if \write_align == 32
     tst     r0, #16
     ldrne   r3, [r1]
-    beq     11f
+    beq     31f
     ldr     ip, [r1, #4]
     str     r3, [r0]
     sub     r2, r2, #16
@@ -1468,7 +1471,7 @@ asm_function memcpy_armv5te
     str     ip, [r0, #12]
     add     r1, #16
     add     r0, #16
-11:
+31:
 .endif
 .endm
 
@@ -1512,13 +1515,13 @@ asm_function memcpy_armv5te
     b       26f
 25:
 .endif
-    cmp     r2, #32    
+    cmp     r2, #32
 
     blt     22f
 26:
 .if \write_align == \line_size
-    mov     r9, #\preload_offset
     push    {r7-r11}
+    mov     r9, #\preload_offset
     sub     r2, r2, #32
 .else
     add     r3, r1, #\preload_offset
@@ -1573,7 +1576,7 @@ asm_function memcpy_armv5te
     ldrge   ip, [r1], #4
     orrge   r3, r3, ip, asl #(32 - \shift * 8)
     strge   r3, [r0], #4
-    bge     23b
+    bgt     23b
 
 24:
     sub     r1, r1, #(4 - \shift)
@@ -1596,7 +1599,7 @@ asm_function memcpy_armv5te
     ldrge  r3, [r1], #4
     strge  r3, [r0], #4
     ldrge  r3, [r1], #4
-    sub    r2, r2, #8
+    subge  r2, r2, #8
     strge  r3, [r0], #4
     bgt    4b
     moveq  r0, ip
@@ -1640,7 +1643,7 @@ asm_function memcpy_armv5te
 2:
     MEMCPY_VARIANT_SIMPLE_WRITE_ALIGN \write_align
 
-    cmp     r2, #32
+    cmp     r2, #\line_size
     pop     {r3}
     pushge  {r4-r11}
 .if \write_align == \line_size
@@ -1654,6 +1657,8 @@ asm_function memcpy_armv5te
     pld     [r3, #(\line_size * 2)]
     sub     ip, ip, r1
 .endif
+
+.if \line_size == 32
     sub     r2, r2, #32
 5:
     /*
@@ -1675,7 +1680,47 @@ asm_function memcpy_armv5te
     pop     {r4-r11}
     popeq   {r0}
     bxeq    lr
+.endif
+
+.if \line_size == 64
+    sub     r2, r2, #64
+5:
+    /*
+     * The main loop for large sizes. Copy 64 bytes at a time
+     * using ldmia/stmia while prefetching a 64-byte aligned
+     * address.
+     */
+    pld     [r1, ip]
+    ldmia   r1!, {r4-r11}
+    subs    r2, r2, #64
+    stmia   r0!, {r4-r11}
+    ldmia   r1!, {r4-r11}
+    stmia   r0!, {r4-r11}
+    bge     5b
+    adds    r2, r2, #64
+    pop     {r4-r11}
+    popeq   {r0}
+    bxeq    lr
+.endif
+
 6:
+.if \line_size == 64
+    cmp     r2, #32
+    ldmiage r1!, {r3, ip}
+    blt     10f
+    stmia   r0!, {r3, ip}
+    ldmia   r1!, {r3, ip}
+    stmia   r0!, {r3, ip}
+    ldmia   r1!, {r3, ip}
+    stmia   r0!, {r3, ip}
+    ldmia   r1!, {r3, ip}
+    sub     r2, r2, #32
+    stmia   r0!, {r3, ip}
+    popeq   {r0}
+    bxeq    lr
+10:
+.endif
+
     cmp     r2, #16
     ldrge   r3, [r1]
     ldrge   ip, [r1, #4]
@@ -1800,7 +1845,7 @@ asm_function memcpy_armv5te
 /* memcpy replacement for the Allwinner platform. */
 
 asm_function memcpy
-    MEMCPY_VARIANT 1, 64, 32, 32, 192, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 1, 0
 .endfunc
 
 #endif
@@ -1993,7 +2038,7 @@ asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
 .endfunc
 
 asm_function memcpy_simple
-    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 96, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 1, 0
 .endfunc
 
 #endif
