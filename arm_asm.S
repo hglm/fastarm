@@ -768,23 +768,31 @@ asm_function memcpy_armv5te
     tst    r0, #3
     andseq r3, r1, #3
     /* If not, jump to the unaligned code for small sizes */
-    bne    9f
-.endif
     mov    ip, r0
+    bne    9f
+.else
+    mov    ip, r0
+.endif
 
     /* Copy words. Fast path for small sizes with word aligned src and dest. */
     /* ip must be equal to the original r0. */
 29:
 22:
-    subs   r2, r2, #8
+    cmp    r2, #8
     ldrge  r3, [r1], #4
     strge  r3, [r0], #4
     ldrge  r3, [r1], #4
+    sub    r2, r2, #8
     strge  r3, [r0], #4
-    bge    22b
+    bgt    22b
+    moveq  r0,ip
+    bxeq   lr
     tst    r2, #4
     ldrne  r3, [r1], #4
     strne  r3, [r0], #4
+    tst    r2, #3
+    moveq  r0, ip
+    bxeq   lr
 .if \granularity <= 2
     tst    r2, #2
     ldrhne r3, [r1], #2
@@ -799,9 +807,28 @@ asm_function memcpy_armv5te
     bx     lr
 
 1:
-    /* Larger sizes. */
-    /* copy data until destination address is 4 bytes aligned */
+    /*
+     * Larger sizes. Copy data until destination address is 4 bytes aligned.
+     * Optimize the common case in which both source and destination are
+     * are already word-aligned.
+     */
+.if \granularity == 1
+    tst     r0, #3
     stmfd   sp!, {r0, r4}
+    andseq  r3, r1, #3
+    stmfd   sp!, {r5, r6}
+#ifdef CHECK_EARLY_PRELOADS
+.if \preload_early == 1
+    /* Determine the 32-byte aligned address of the last byte. */
+    addeq   r6, r1, r2
+.endif
+#endif
+    beq 2f
+.else
+    stmfd   sp!, {r0, r4}
+    stmfd   sp!, {r5, r6}
+.endif
+
 .if \granularity == 1
     tst     r0, #1
     ldrbne  r4, [r1], #1
@@ -813,7 +840,6 @@ asm_function memcpy_armv5te
     tst     r0, #2
     ldrbne  r4, [r1], #1
 .endif
-    stmfd   sp!, {r5, r6}
 .if \granularity <= 2
     ldrbne  r5, [r1], #1
     subne   r2, r2, #2
@@ -838,9 +864,6 @@ asm_function memcpy_armv5te
     sub     r6, r6, #1
 .endif
 #endif
-.if \preload_early == 1
-    pld     [r3, #\line_size]
-.endif
 #ifdef CHECK_EARLY_PRELOADS
 .if \preload_early == 1
     bic     r6, r6, #(\line_size - 1)
@@ -858,9 +881,31 @@ asm_function memcpy_armv5te
 .if \granularity <= 2
     bne     7f
 .endif
-
-    /* both source and destination are 4 bytes aligned */
     tst     r0, #4
+    b       3f
+
+2:
+    /* Further optimize for the 16-byte aligned case. */
+    tst     r0, #12
+#ifdef CHECK_EARLY_PRELOADS
+.if \preload_early == 1
+    sub     r6, r6, #1
+.endif
+#endif
+.if \preload_early == 1
+    pld     [r3, #\line_size]
+.endif
+#ifdef CHECK_EARLY_PRELOADS
+.if \preload_early == 1
+    bic     r6, r6, #(\line_size - 1)
+.endif
+#endif
+    stmfd   sp!, {r7}
+    beq     1f
+    tst     r0, #4
+
+3:
+    /* both source and destination are 4 bytes aligned */
 #ifdef CHECK_EARLY_PRELOADS
 .if \preload_early == 1
     mov     ip, r6
@@ -873,6 +918,7 @@ asm_function memcpy_armv5te
     ldmiane r1!, {r4, r5}
     subne   r2, r2, #8
     stmiane r0!, {r4, r5}
+1:
 .if \write_align >= 32
     tst     r0, #16
     ldmiane r1!, {r4-r7}
@@ -1166,6 +1212,7 @@ asm_function memcpy_armv5te
     ldmfd   sp!, {r7}
     ldmiane r1!, {r3-r6}
     stmiane r0!, {r3-r6}
+3:
     tst     r2, #8
     ldmiane r1!, {r3-r4}
     stmiane r0!, {r3-r4}
@@ -1173,6 +1220,13 @@ asm_function memcpy_armv5te
     ldrne   r3, [r1], #4
     mov     ip, r0
     strne   r3, [ip], #4
+.if \granularity == 1
+    /* Optimize for the word-sized case. */
+    tst     r2, #3
+    ldmfdeq sp!, {r5, r6}
+    ldmfdeq sp!, {r0, r4}
+    bxeq    lr
+.endif
 .if \granularity <= 2
     tst     r2, #2
     ldrhne  r3, [r1], #2
@@ -1183,11 +1237,11 @@ asm_function memcpy_armv5te
 .endif
 .if \granularity == 1
     tst     r2, #1
-    ldrbne  r3, [r1], #1
+    ldrbne  r3, [r1]
 .endif
     ldmfd   sp!, {r0, r4}
 .if \granularity == 1
-    strbne  r3, [ip], #1
+    strbne  r3, [ip]
 .endif
     bx      lr
 5:

@@ -174,10 +174,40 @@ static void test_unaligned_random_8(int i) {
         8);
 }
 
+static void test_aligned_4(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        4);
+}
+
 static void test_aligned_8(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
         buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
         8);
+}
+
+static void test_aligned_16(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        16);
+}
+
+static void test_aligned_32(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        32);
+}
+
+static void test_aligned_64(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        64);
+}
+
+static void test_aligned_128(int i) {
+    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        128);
 }
 
 static void test_unaligned_random_17(int i) {
@@ -186,27 +216,21 @@ static void test_unaligned_random_17(int i) {
         17);
 }
 
-static void test_unaligned_random_30(int i) {
+static void test_unaligned_random_28(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
         buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
-        30);
+        28);
 }
 
-static void test_aligned_30(int i) {
+static void test_aligned_28(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
         buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
-        30);
+        28);
 }
 
 static void test_unaligned_random_64(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
         buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
-        64);
-}
-
-static void test_aligned_64(int i) {
-    memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
-        buffer_page + 8192 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
         64);
 }
 
@@ -260,10 +284,10 @@ static void test_source_dest_aligned_random_1M(int i) {
         1024 * 1024);
 }
 
-static void test_word_aligned_30(int i) {
+static void test_word_aligned_28(int i) {
     memcpy_func(buffer_page + random_buffer_1024[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
         buffer_page + 64 * 1024 + random_buffer_1024[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
-        30);
+        28);
 }
 
 static void test_word_aligned_64(int i) {
@@ -545,7 +569,7 @@ static void do_validation(int repeat) {
     }
 }
 
-#define NU_TESTS 42
+#define NU_TESTS 46
 
 typedef struct {
     const char *name;
@@ -555,15 +579,19 @@ typedef struct {
 
 static test_t test[NU_TESTS] = {
     { "Mixed powers of 2 from 16 to 65536 (power law), word aligned", test_mixed_powers_of_two_word_aligned, 32768 },
+    { "4 bytes word aligned", test_aligned_4, 4 },
+    { "8 bytes word aligned", test_aligned_8, 8 },
+    { "16 bytes word aligned", test_aligned_16, 16 },
+    { "28 bytes word aligned", test_aligned_28, 28 },
+    { "32 bytes word aligned", test_aligned_32, 32 },
+    { "64 bytes word aligned", test_aligned_64, 64 },
+    { "128 bytes word aligned", test_aligned_128, 128 },
     { "Mixed from 16 to 65535 (power law), unaligned", test_mixed_power_law_unaligned, 32768 },
     { "3 bytes randomly aligned", test_unaligned_random_3, 3 },
     { "8 bytes randomly aligned", test_unaligned_random_8, 8 },
-    { "8 bytes word aligned", test_aligned_8, 8 },
     { "17 bytes randomly aligned", test_unaligned_random_17, 17 },
-    { "30 bytes randomly aligned", test_unaligned_random_30, 30 },
-    { "30 bytes word aligned", test_aligned_30, 30 },
+    { "28 bytes randomly aligned", test_unaligned_random_28, 28 },
     { "64 bytes randomly aligned", test_unaligned_random_64, 64 },
-    { "64 bytes word aligned", test_aligned_64, 64 },
     { "137 bytes randomly aligned", test_unaligned_random_137, 137 },
     { "1024 bytes randomly aligned", test_unaligned_random_1024, 1024 },
     { "32768 bytes randomly aligned", test_unaligned_random_32768, 32768 },
@@ -588,7 +616,7 @@ static test_t test[NU_TESTS] = {
        130 },
     { "Up to 64 bytes word aligned (DRAM)", test_random_mixed_sizes_DRAM_word_aligned_64,
        34 },
-    { "30 bytes 4-byte aligned", test_word_aligned_30, 30 },
+    { "28 bytes 4-byte aligned", test_word_aligned_28, 28 },
     { "64 bytes 4-byte aligned", test_word_aligned_64, 64 },
     { "296 bytes 4-byte aligned", test_word_aligned_296, 296 },
     { "1024 bytes 4-byte aligned", test_word_aligned_1024, 1024 },
@@ -756,7 +784,7 @@ int main(int argc, char *argv[]) {
         random_buffer_up_to_65535_power_law[i] = 16 + (int)floor(65520.0 * (pow(3.0, 10.0 * (double)rand() / RAND_MAX) - 1.0) / (pow(3.0, 10.0) - 1.0));
         random_buffer_up_to_65535_power_law_total_bytes += random_buffer_up_to_65535_power_law[i];
     }
-    test[1].bytes = random_buffer_up_to_65535_power_law_total_bytes / RANDOM_BUFFER_SIZE;
+    test[8].bytes = random_buffer_up_to_65535_power_law_total_bytes / RANDOM_BUFFER_SIZE;
 
 
     if (sizeof(size_t) != sizeof(int)) {
