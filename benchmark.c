@@ -41,11 +41,11 @@
 
 void *armmem_memcpy(void * restrict s1, const void * restrict s2, size_t n);
 
-#define NU_MEMCPY_VARIANTS 38
+#define NU_MEMCPY_VARIANTS 39
 
 #else
 
-#define NU_MEMCPY_VARIANTS 37
+#define NU_MEMCPY_VARIANTS 38
 
 #endif
 
@@ -64,6 +64,7 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "libarmmem memcpy",
 #endif
     "armv5te memcpy",
+    "simple memcpy with unaligned source access",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 8, preload offset 96",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 16, preload offset 96",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 16, preload offset 96 with early preload",
@@ -107,6 +108,7 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     armmem_memcpy,
 #endif
     memcpy_armv5te,
+    memcpy_simple,
     memcpy_armv5te_no_overfetch_align_16_block_write_8_preload_96,
     memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_96,
     memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_early_96,

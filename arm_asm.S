@@ -290,6 +290,12 @@ asm_function memcpy_armv5te
 // #define CHECK_EARLY_PRELOADS
 
 /*
+ * Allow unaligned memory access.
+ */
+
+#define UNALIGNED_ACCESS
+
+/*
  * Helper macro for non-overfetching version.
  *
  * If preload_early == 1,
@@ -1431,6 +1437,309 @@ asm_function memcpy_armv5te
 
 .endm
 
+.macro MEMCPY_VARIANT_SIMPLE granularity, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
+    cmp     r2, #68
+    bic     r3, r1, #(\line_size - 1)
+    mov     ip, r0
+.if \preload_early == 1
+    pld     [r3]
+.endif
+    bge     1f
+
+    /*
+     * Loop for sizes < 64 bytes; don't care about unaligned access.
+     */
+4:
+    cmp    r2, #8
+    ldrge  r3, [r1], #4
+    strge  r3, [r0], #4
+    ldrge  r3, [r1], #4
+    sub    r2, r2, #8
+    strge  r3, [r0], #4
+    bgt    4b
+    moveq  r0, ip
+    bxeq   lr
+    tst    r2, #4
+    ldrne  r3, [r1], #4
+    strne  r3, [r0], #4
+    tst    r2, #3
+    moveq  r0, ip
+    bxeq   lr
+.if \granularity <= 2
+    tst    r2, #2
+    ldrhne r3, [r1], #2
+    strhne r3, [r0], #2
+.endif
+.if \granularity == 1
+    tst    r2, #1
+    ldrbne r3, [r1]
+    strbne r3, [r0]
+.endif
+    mov    r0, ip
+    bx     lr
+
+1:
+.if \granularity <= 2
+    tst     r0, #3
+.endif
+    push    {r0}
+.if \preload_early == 1
+    pld     [r3, #\line_size]
+.endif
+    push    {r3}
+.if \granularity <= 2
+    bne     3f
+.endif
+
+    /* Larger sizes with word aligned source and destination. */
+2:
+    /* Align to a 16-byte or 32-byte boundary. */
+    tst     r0, #4
+    ldrne   r3, [r1], #4
+    subne   r2, r2, #4
+    strne   r3, [r0], #4
+    tst     r0, #8
+    ldrne   r3, [r1], #4
+    ldrne   ip, [r1], #4
+    subne   r2, r2, #8
+    strne   r3, [r0], #4
+    strne   ip, [r0], #4
+.if \write_align == 32
+    tst     r0, #16
+    ldrne   r3, [r1]
+    beq     1f
+    ldr     ip, [r1, #4]
+    str     r3, [r0]
+    sub     r2, r2, #16
+    str     ip, [r0, #4]
+    ldr     r3, [r1, #8]
+    ldr     ip, [r1, #12]
+    str     r3, [r0, #8]
+    str     ip, [r0, #12]
+    add     r1, #16
+    add     r0, #16
+1:
+.endif
+    cmp     r2, #32
+    pop     {r3}
+.if \block_write_size == 32
+    pushge  {r4-r11}
+.else
+    pushge  {r4-r7}
+.endif
+    addge   ip, r1, #\preload_offset
+    blt     6f
+    bic     ip, ip, #(\line_size - 1)
+    pld     [r3, #(\line_size * 2)]
+    sub     ip, ip, r1
+5:
+    /*
+     * The mainl loop for large sizes. Copy 32 bytes at a time
+     * using ldmia/stmia while prefetching a 32-byte aligned
+     * address.
+     */
+    cmp     r2, #(32 + 32)
+.if \block_write_size == 32
+    ldmia   r1!, {r4-r11}
+.else
+    ldmia   r1!, {r4-r7}
+.endif
+    sub     r2, r2, #32
+.if \block_write_size == 32
+    stmia   r0!, {r4-r11}
+.else
+    stmia   r0!, {r4-r7}
+    ldmia   r1!, {r4-r7}
+    stmia   r0!, {r4-r7}
+.endif
+    pld     [r1, ip]
+    bge     5b
+    tst     r2, #31
+.if \block_write_size == 32
+    pop     {r4-r11}
+.else
+    pop     {r4-r7}
+.endif
+    popeq   {r0}
+    bxeq    lr
+6:
+    cmp     r2, #16
+    ldrge   r3, [r1]
+    ldrge   ip, [r1, #4]
+    blt     7f
+    strge   r3, [r0]
+    strge   ip, [r0, #4]
+    ldrge   r3, [r1, #8]
+    ldrge   ip, [r1, #12]
+    strge   r3, [r0, #8]
+    strge   ip, [r0, #12]
+    addge   r1, r1, #16
+    addge   r0, r0, #16
+    subge   r2, r2, #16
+    popeq   {r0}
+    bxeq    lr
+7:
+    cmp     r2, #8
+    ldrge   r3, [r1]
+    ldrge   ip, [r1, #4]
+    addge   r1, r1, #8
+    strge   r3, [r0]
+    strge   ip, [r0, #4]
+    pop     {ip}
+    addge   r0, r0, #8
+    moveq   r0, ip
+    bxeq    lr
+
+    tst     r2, #4
+    ldrne   r3, [r1], #4
+    strne   r3, [r0], #4
+    tst     r2, #3
+    moveq   r0, ip
+    bxeq    lr
+.if \granularity <= 2
+    tst     r2, #2
+    ldrhne  r3, [r1], #2
+    strhne  r3, [r0], #2
+.endif
+.if \granularity == 1
+    tst     r2, #1
+    ldrbne  r3, [r1]
+    strbne  r3, [r0]
+.endif
+    mov     r0, ip
+    bx      lr
+
+.if \granularity <= 2
+3:
+    /*
+     * Copy data until destination address is 4 bytes aligned.
+     */
+.if \granularity == 1
+    tst     r0, #1
+    ldrbne  r3, [r1], #1
+    subne   r2, r2, #1
+    strbne  r3, [r0], #1
+.endif
+
+    tst     r0, #2
+    ldrbne  r3, [r1], #1
+    ldrbne  ip, [r1], #1
+    subne   r2, r2, #2
+    orrne   r3, r3, ip, asl #8
+    strhne  r3, [r0], #2
+    /* destination address is 4 bytes aligned */
+
+    tst     r1, #3
+    popne   {r3}
+    beq     2b
+
+    /* Unaligned copy. */
+.if \granularity == 1
+    tst     r1, #1
+.endif
+.if \preload_early == 1
+    pld     [r3, #(\line_size * 2)]
+.endif
+.if \granularity == 1
+    bne     2f
+.endif
+
+    /* shift 2 */
+//    sub     r1, r1, #2
+//    ldr     ip, [r1], #4
+    ldr     ip, [r1, #-2]
+    add     r1, r1, #2
+1:
+    subs    r2, r2, #4
+    movge   r3, ip, lsr #(2 * 8)
+    ldrge   ip, [r1], #4
+    orrge   r3, r3, ip, asl #(32 - 2 * 8)
+    strge   r3, [r0], #4
+    bge     1b
+
+    sub     r1, r1, #2
+    tst     r2, #2
+    ldrbne  r3, [r1], #1
+    ldrbne  ip, [r1], #1
+    strbne  r3, [r0], #1
+    strbne  ip, [r0], #1
+
+.if \granularity == 1
+    tst     r2, #1
+    mov     ip, r0
+    ldrbne  r3, [r1]
+    ldr     r0, [sp], #4
+    strbne  r3, [ip]
+.else
+    pop     {r0}
+.endif
+    bx      lr
+
+.if \granularity == 1
+3:
+    /* Shift 3. */
+//    sub     r1, r1, #3
+//    ldr     ip, [r1], #4
+    ldr     ip, [r1, #-3]
+    add     r1, r1, #1
+1:
+    subs    r2, r2, #4
+    movge   r3, ip, lsr #(3 * 8)
+    ldrge   ip, [r1], #4
+    orrge   r3, r3, ip, asl #(32 - 3 * 8)
+    strge   r3, [r0], #4
+    bge     1b
+
+    sub     r1, r1, #1
+    tst     r2, #2
+    ldrbne  r3, [r1], #1
+    ldrbne  ip, [r1], #1
+    strbne  r3, [r0], #1
+    strbne  ip, [r0], #1
+
+    tst     r2, #1
+    mov     ip, r0
+    ldrbne  r3, [r1]
+    ldr     r0, [sp], #4
+    strbne  r3, [ip]
+    bx      lr
+
+2:
+    tst     r1, #2
+    bne     3b
+
+    /* Shift 1. */
+//    sub     r1, r1, #1
+//    ldr     ip, [r1], #4
+    ldr     ip, [r1, #-1]
+    add     r1, r1, #3
+1:
+    subs    r2, r2, #4
+    movge   r3, ip, lsr #(1 * 8)
+    ldrge   ip, [r1], #4
+    orrge   r3, r3, ip, asl #(32 - 1 * 8)
+    strge   r3, [r0], #4
+    bge     1b
+
+    sub     r1, r1, #3
+    tst     r2, #2
+    ldrbne  r3, [r1], #1
+    ldrbne  ip, [r1], #1
+    strbne  r3, [r0], #1
+    strbne  ip, [r0], #1
+
+    tst     r2, #1
+    mov     ip, r0
+    ldrbne  r3, [r1]
+    ldr     r0, [sp], #4
+    strbne  r3, [ip]
+    bx      lr
+.endif
+
+.endif
+
+.endm
+
 #if defined(MEMCPY_REPLACEMENT_SUNXI) || defined(MEMCPY_REPLACEMENT_RPI)
 
 #ifdef MEMCPY_REPLACEMENT_SUNXI
@@ -1627,6 +1936,10 @@ asm_function memcpy_armv5te_overfetch_align_16_block_write_16_preload_early_128
 
 asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
     MEMCPY_VARIANT 1, 32, 32, 32, 192, 1, 1
+.endfunc
+
+asm_function memcpy_simple
+    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 32, 192, 1, 0
 .endfunc
 
 #endif
