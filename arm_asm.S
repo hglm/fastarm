@@ -1467,9 +1467,9 @@ asm_function memcpy_armv5te
     str     ip, [r0, #4]
     ldr     r3, [r1, #8]
     ldr     ip, [r1, #12]
+    add     r1, #16
     str     r3, [r0, #8]
     str     ip, [r0, #12]
-    add     r1, #16
     add     r0, #16
 31:
 .endif
@@ -1594,6 +1594,10 @@ asm_function memcpy_armv5te
     /*
      * Loop for sizes < 68 bytes; don't care about unaligned access.
      */
+    tst    r2, #4
+    ldrne  r3, [r1], #4
+    subne  r2, r2, #4
+    strne  r3, [r0], #4
 4:
     cmp    r2, #8
     ldrge  r3, [r1], #4
@@ -1602,14 +1606,11 @@ asm_function memcpy_armv5te
     subge  r2, r2, #8
     strge  r3, [r0], #4
     bgt    4b
+.if \granularity <= 2
+    tstne  r2, #3
     moveq  r0, ip
     bxeq   lr
-    tst    r2, #4
-    ldrne  r3, [r1], #4
-    strne  r3, [r0], #4
-    tst    r2, #3
-    moveq  r0, ip
-    bxeq   lr
+.endif
 .if \granularity <= 2
     tst    r2, #2
     ldrhne r3, [r1], #2
@@ -1624,6 +1625,7 @@ asm_function memcpy_armv5te
     bx     lr
 
 1:
+    /* Check that both destination and source are word aligned. */
 .if \granularity <= 2
     tst     r0, #3
 .endif
@@ -1727,13 +1729,13 @@ asm_function memcpy_armv5te
     blt     7f
     strge   r3, [r0]
     strge   ip, [r0, #4]
+    subge   r2, r2, #16
     ldrge   r3, [r1, #8]
     ldrge   ip, [r1, #12]
+    addge   r1, r1, #16
     strge   r3, [r0, #8]
     strge   ip, [r0, #12]
-    addge   r1, r1, #16
     addge   r0, r0, #16
-    subge   r2, r2, #16
     popeq   {r0}
     bxeq    lr
 7:
@@ -1743,8 +1745,8 @@ asm_function memcpy_armv5te
     addge   r1, r1, #8
     strge   r3, [r0]
     strge   ip, [r0, #4]
-    pop     {ip}
     addge   r0, r0, #8
+    pop     {ip}
     moveq   r0, ip
     bxeq    lr
 

@@ -4,6 +4,11 @@ This toolkit contains a set of fast memcpy variants for ARM platforms.
 They uses the standard register file, VFP or NEON registers are not
 used.
 
+Two basic families are provided: a simpler one that is optimized for
+common cases and does possible unaligned memory access for small sizes;
+and a more complicated one that always uses aligned memory access and
+can be configured not to overfetch being the source region.
+
 To compile the benchmark program, run 'make'. This will compile in a
 plethora of variants with different preload strategies, block sizes,
 alignment etc.
