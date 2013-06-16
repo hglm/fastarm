@@ -1745,8 +1745,18 @@ asm_function memcpy_armv5te
 .endif
 
 .if \line_size == 32
-.if \preload_early == 1 && \preload_offset >= 96 && \line_size == 32
+.if \preload_early == 1 && \preload_offset >= 96
+#ifdef PRELOAD_CATCH_UP
+    add     r3, r3, #(\line_size * 4)
+    add     r4, r1, ip
+11:
+    cmp     r3, r4
+    pld     [r3, #-\line_size]
+    add     r3, r3, #\line_size
+    blt     11b
+#else
     pld     [r3, #(\line_size * 3)]
+#endif
 .endif
     sub     r2, r2, #32
 5:
