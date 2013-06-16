@@ -1707,34 +1707,47 @@ asm_function memcpy_armv5te
 .if (68 - (\write_align - 1)) >= \line_size
     pop     {r3}
 .if \write_align == \line_size
-    push    {r4-r11}
     mov     ip, #\preload_offset
+.if \preload_early == 1
     pld     [r3, #(\line_size * 2)]
+.endif
+    push    {r4-r11}
 .else
     add     ip, r1, #\preload_offset
+.if \preload_early == 1
+    pld     [r3, #(\line_size * 2)]
+.endif
     push    {r4-r11}
     bic     ip, ip, #(\line_size - 1)
-    pld     [r3, #(\line_size * 2)]
     sub     ip, ip, r1
 .endif
 .else
     cmp     r2, #\line_size
-    pop     {r3}
-    pushge  {r4-r11}
 .if \write_align == \line_size
+    pop     {r3}
     mov     ip, #\preload_offset
-    blt     6f
+.if \preload_early == 1
     pld     [r3, #(\line_size * 2)]
+.endif
+    pushge  {r4-r11}
+    blt     6f
 .else
+    pop     {r3}
     addge   ip, r1, #\preload_offset
+.if \preload_early == 1
+    pld     [r3, #(\line_size * 2)]
+.endif
+    pushge  {r4-r11}
     blt     6f
     bic     ip, ip, #(\line_size - 1)
-    pld     [r3, #(\line_size * 2)]
     sub     ip, ip, r1
 .endif
 .endif
 
 .if \line_size == 32
+.if \preload_early == 1 && \preload_offset >= 96 && \line_size == 32
+    pld     [r3, #(\line_size * 3)]
+.endif
     sub     r2, r2, #32
 5:
     /*

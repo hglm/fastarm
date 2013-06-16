@@ -64,7 +64,7 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "libarmmem memcpy",
 #endif
     "armv5te memcpy",
-    "simple memcpy with unaligned source access",
+    "simplified memcpy with unaligned access for small sizes",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 8, preload offset 96",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 16, preload offset 96",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 16, preload offset 96 with early preload",
