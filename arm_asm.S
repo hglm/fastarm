@@ -1475,7 +1475,45 @@ asm_function memcpy_armv5te
 .endif
 .endm
 
-.macro MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART shift, line_size, write_align, block_write_size, preload_offset
+.macro MEMCPY_VARIANT_SIMPLE_WRITE_ALIGN_CUSTOM
+    /*
+     * Align destination to a 16-byte or 32-byte boundary,
+     * depending on whether the 32-byte alignment of the
+     * source is optimal.
+     */
+    tst     r0, #4
+    ldrne   r3, [r1], #4
+    subne   r2, r2, #4
+    strne   r3, [r0], #4
+    tst     r0, #8
+    ldrne   r3, [r1], #4
+    ldrne   ip, [r1], #4
+    subne   r2, r2, #8
+    strne   r3, [r0], #4
+    strne   ip, [r0], #4
+    /*
+     * If (source & 16) is zero, allow write aligning to 32 bytes.
+     * This improves performance.
+     */
+    eor     r3, r1, r0
+    tst     r0, #16
+    tstne   r3, #16
+    ldrne   r3, [r1]
+    beq     31f
+    ldr     ip, [r1, #4]
+    str     r3, [r0]
+    sub     r2, r2, #16
+    str     ip, [r0, #4]
+    ldr     r3, [r1, #8]
+    ldr     ip, [r1, #12]
+    add     r1, #16
+    str     r3, [r0, #8]
+    str     ip, [r0, #12]
+    add     r0, #16
+31:
+.endm
+
+.macro MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART shift, line_size, write_align, block_write_size, preload_offset, custom_write_align
     ldr     ip, [r1, #(-\shift)]
     add     r1, r1, #(4 - \shift)
 
@@ -1497,7 +1535,13 @@ asm_function memcpy_armv5te
     stmiane r0!, {r3-r4}
 
 .if \write_align == 32
+.if \custom_write_align == 1
+    eor     r3, r1, r0
     tst     r0, #16
+    tstne   r3, #16
+.else
+    tst     r0, #16
+.endif
     movne   r3, ip, lsr #(\shift * 8)
     beq     25f
     ldmia   r1!, {r4-r6, ip}
@@ -1529,7 +1573,7 @@ asm_function memcpy_armv5te
     blt     22f
 .endif
 26:
-.if \write_align == \line_size
+.if \write_align == \line_size && 0
     push    {r7-r11}
     mov     r9, #\preload_offset
     sub     r2, r2, #32
@@ -1595,7 +1639,7 @@ asm_function memcpy_armv5te
 
 #define CHECK_SMALL_SIZE_ALIGNMENT
 
-.macro MEMCPY_VARIANT_SIMPLE granularity, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
+.macro MEMCPY_VARIANT_SIMPLE granularity, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch, custom_write_align
     cmp     r2, #68
 .if \preload_early == 1
     bic     r3, r1, #(\line_size - 1)
@@ -1695,18 +1739,21 @@ asm_function memcpy_armv5te
 .if \granularity <= 2
     bne     3f
 .endif
-    
+
     /* Larger sizes with word aligned source and destination. */
 2:
+.if \custom_write_align == 1
+    MEMCPY_VARIANT_SIMPLE_WRITE_ALIGN_CUSTOM
+.else
     MEMCPY_VARIANT_SIMPLE_WRITE_ALIGN \write_align
-
+.endif
     /*
      * We don't need a check if the number of bytes left is guaranteed to
      * be >= line_size.
      */
 .if (68 - (\write_align - 1)) >= \line_size
     pop     {r3}
-.if \write_align == \line_size
+.if \write_align == \line_size && 0
     mov     ip, #\preload_offset
 .if \preload_early == 1
     pld     [r3, #(\line_size * 2)]
@@ -1723,7 +1770,7 @@ asm_function memcpy_armv5te
 .endif
 .else
     cmp     r2, #\line_size
-.if \write_align == \line_size
+.if \write_align == \line_size && 0
     pop     {r3}
     mov     ip, #\preload_offset
 .if \preload_early == 1
@@ -1747,13 +1794,17 @@ asm_function memcpy_armv5te
 .if \line_size == 32
 .if \preload_early == 1 && \preload_offset >= 96
 #ifdef PRELOAD_CATCH_UP
-    add     r3, r3, #(\line_size * 4)
     add     r4, r1, ip
+    add     r3, r3, #(\line_size * 3)
+    cmp     r3, r4
+    addlt   r3, r3, #\line_size
+    bge     12f
 11:
     cmp     r3, r4
     pld     [r3, #-\line_size]
     add     r3, r3, #\line_size
     blt     11b
+12:
 #else
     pld     [r3, #(\line_size * 3)]
 #endif
@@ -1766,11 +1817,14 @@ asm_function memcpy_armv5te
      * address.
      */
     pld     [r1, ip]
+.if \block_write_size == 32
     ldmia   r1!, {r4-r11}
     subs    r2, r2, #32
-.if \block_write_size == 32
     stmia   r0!, {r4-r11}
 .else
+    ldmia   r1!, {r4-r7}
+    subs    r2, r2, #32
+    ldmia   r1!, {r8-r11}
     stmia   r0!, {r4-r7}
     stmia   r0!, {r8-r11}
 .endif
@@ -1900,7 +1954,7 @@ asm_function memcpy_armv5te
     bne     2f
 .endif
 
-    MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART 2, line_size, write_align, block_write_size, preload_offset
+    MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART 2, line_size, write_align, block_write_size, preload_offset, custom_write_align
 4:
     tst     r2, #2
     ldrbne  r3, [r1], #1
@@ -1921,14 +1975,14 @@ asm_function memcpy_armv5te
 
 .if \granularity == 1
 3:
-    MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART 3, line_size, write_align, block_write_size, preload_offset
+    MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART 3, line_size, write_align, block_write_size, preload_offset, custom_write_align
     b       4b
 
 2:
     tst     r1, #2
     bne     3b
 
-    MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART 1, line_size, write_align, block_write_size, preload_offset
+    MEMCPY_VARIANT_SIMPLE_UNALIGNED_MAIN_PART 1, line_size, write_align, block_write_size, preload_offset, custom_write_align
     b       4b
 .endif
 
@@ -1943,7 +1997,7 @@ asm_function memcpy_armv5te
 /* memcpy replacement for the Allwinner platform. */
 
 asm_function memcpy
-    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 1, 0, 0
 .endfunc
 
 #endif
@@ -1954,7 +2008,7 @@ asm_function memcpy
 
 asm_function memcpy
 /*     MEMCPY_VARIANT 1, 32, 16, 16, 128, 1, 0 */
-    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 128, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 128, 1, 0, 0
 .endfunc
 
 #endif
@@ -2136,7 +2190,7 @@ asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
 .endfunc
 
 asm_function memcpy_simple
-    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 128, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 16, 128, 1, 0, 1
 .endfunc
 
 #endif
