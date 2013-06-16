@@ -1515,9 +1515,15 @@ asm_function memcpy_armv5te
     b       26f
 25:
 .endif
-    cmp     r2, #32
 
+    /*
+     * We don't need a check if the number of bytes left is guaranteed to
+     * be >= line_size.
+     */
+.if (68 - (\write_align - 1)) < \line_size
+    cmp     r2, #32
     blt     22f
+.endif
 26:
 .if \write_align == \line_size
     push    {r7-r11}
@@ -1584,7 +1590,9 @@ asm_function memcpy_armv5te
 
 .macro MEMCPY_VARIANT_SIMPLE granularity, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
     cmp     r2, #68
+.if \preload_early == 1
     bic     r3, r1, #(\line_size - 1)
+.endif
     mov     ip, r0
 .if \preload_early == 1
     pld     [r3]
@@ -1645,6 +1653,24 @@ asm_function memcpy_armv5te
 2:
     MEMCPY_VARIANT_SIMPLE_WRITE_ALIGN \write_align
 
+    /*
+     * We don't need a check if the number of bytes left is guaranteed to
+     * be >= line_size.
+     */
+.if (68 - (\write_align - 1)) >= \line_size
+    pop     {r3}
+.if \write_align == \line_size
+    push    {r4-r11}
+    mov     ip, #\preload_offset
+    pld     [r3, #(\line_size * 2)]
+.else
+    add     ip, r1, #\preload_offset
+    push    {r4-r11}
+    bic     ip, ip, #(\line_size - 1)
+    pld     [r3, #(\line_size * 2)]
+    sub     ip, ip, r1
+.endif
+.else
     cmp     r2, #\line_size
     pop     {r3}
     pushge  {r4-r11}
@@ -1658,6 +1684,7 @@ asm_function memcpy_armv5te
     bic     ip, ip, #(\line_size - 1)
     pld     [r3, #(\line_size * 2)]
     sub     ip, ip, r1
+.endif
 .endif
 
 .if \line_size == 32
@@ -1727,28 +1754,27 @@ asm_function memcpy_armv5te
     ldrge   r3, [r1]
     ldrge   ip, [r1, #4]
     blt     7f
-    strge   r3, [r0]
-    strge   ip, [r0, #4]
-    subge   r2, r2, #16
-    ldrge   r3, [r1, #8]
-    ldrge   ip, [r1, #12]
-    addge   r1, r1, #16
-    strge   r3, [r0, #8]
-    strge   ip, [r0, #12]
-    addge   r0, r0, #16
+    sub     r2, r2, #16
+    str     r3, [r0]
+    str     ip, [r0, #4]
+    ldr     r3, [r1, #8]
+    ldr     ip, [r1, #12]
+    add     r1, r1, #16
+    str     r3, [r0, #8]
+    str     ip, [r0, #12]
     popeq   {r0}
     bxeq    lr
+    add     r0, r0, #16
 7:
     cmp     r2, #8
-    ldrge   r3, [r1]
-    ldrge   ip, [r1, #4]
-    addge   r1, r1, #8
-    strge   r3, [r0]
-    strge   ip, [r0, #4]
-    addge   r0, r0, #8
+    ldrge   ip, [r1]
+    ldrge   r3, [r1, #4]
+    strge   ip, [r0], #4
     pop     {ip}
+    strge   r3, [r0], #4
     moveq   r0, ip
     bxeq    lr
+    addge   r1, r1, #8
 
     tst     r2, #4
     ldrne   r3, [r1], #4
@@ -2040,7 +2066,7 @@ asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
 .endfunc
 
 asm_function memcpy_simple
-    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 96, 1, 0
 .endfunc
 
 #endif

@@ -7,7 +7,8 @@ used.
 Two basic families are provided: a simpler one that is optimized for
 common cases and does possible unaligned memory access for small sizes;
 and a more complicated one that always uses aligned memory access and
-can be configured not to overfetch being the source region.
+can be configured to "catch-up" early prefetches with the defined preload
+offset and not to overfetch beyond the source region.
 
 To compile the benchmark program, run 'make'. This will compile in a
 plethora of variants with different preload strategies, block sizes,
@@ -24,7 +25,9 @@ and run:
     sudo make install_memcpy_replacement
 
 The replacement memcpy shared library will be installed into
-/usr/lib/arm-linux-gnueabihf/ as libfastarm.so.
+/usr/lib/arm-linux-gnueabihf/ as libfastarm.so. The variant used is currently
+from the simpler family with line size, write alignment and preload offset
+optimized for the platform.
 
 To enable the use of the replacement memcpy in applications, create or edit
 the file /etc/ld.so.preload so that it contains the line:
