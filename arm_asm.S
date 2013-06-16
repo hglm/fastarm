@@ -1504,23 +1504,27 @@ asm_function memcpy_armv5te
     sub     r2, r2, #16
     orr     r3, r3, r4, asl #(32 - \shift * 8)
     mov     r4, r4, lsr #(\shift * 8)
+.if (68 - (\write_align - 1)) < 32
     cmp     r2, #32
+.endif
     orr     r4, r4, r5, asl #(32 - \shift * 8)
     mov     r5, r5, lsr #(\shift * 8)
     orr     r5, r5, r6, asl #(32 - \shift * 8)
     mov     r6, r6, lsr #(\shift * 8)
     orr     r6, r6, ip, asl #(32 - \shift * 8)
     stmia   r0!, {r3-r6}
+.if (68 - (\write_align - 1)) < 32
     blt     22f
     b       26f
+.endif
 25:
 .endif
 
     /*
      * We don't need a check if the number of bytes left is guaranteed to
-     * be >= line_size.
+     * be >= 32.
      */
-.if (68 - (\write_align - 1)) < \line_size
+.if (68 - (\write_align - 1)) < 32
     cmp     r2, #32
     blt     22f
 .endif
@@ -2066,7 +2070,7 @@ asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
 .endfunc
 
 asm_function memcpy_simple
-    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 96, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 1, 0
 .endfunc
 
 #endif
