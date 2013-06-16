@@ -1592,6 +1592,9 @@ asm_function memcpy_armv5te
     sub     r1, r1, #(4 - \shift)
 .endm
 
+
+#define CHECK_SMALL_SIZE_ALIGNMENT
+
 .macro MEMCPY_VARIANT_SIMPLE granularity, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch
     cmp     r2, #68
 .if \preload_early == 1
@@ -1604,8 +1607,21 @@ asm_function memcpy_armv5te
     bge     1f
 
     /*
-     * Loop for sizes < 68 bytes; don't care about unaligned access.
+     * Path for sizes < 68 bytes; don't care about unaligned access
+     * except if both the source and destination are unaligned and
+     * the number of bytes is > 32. This checks costs a few percent
+     * performance for the common word aligned-case.
      */
+#ifdef CHECK_SMALL_SIZE_ALIGNMENT
+.if \granularity <= 2
+    /* This assumes lt flag is set. */
+    tst     r0, #3
+    tstne   r1, #3
+    cmpne   r2, #32
+    bgt     2f
+.endif
+#endif
+3:
     tst    r2, #4
     ldrne  r3, [r1], #4
     subne  r2, r2, #4
@@ -1635,6 +1651,33 @@ asm_function memcpy_armv5te
 .endif
     mov    r0, ip
     bx     lr
+
+#ifdef CHECK_SMALL_SIZE_ALIGNMENT
+.if \granularity <= 2
+2:
+    /* Align the destination. */
+.if \granularity == 1
+    tst     r0, #1
+.if \preload_early == 1 && \line_size == 32
+    pld     [r3, #32]
+.endif
+    ldrbne  r3, [r1], #1
+    subne   r2, r2, #1
+    strbne  r3, [r0], #1
+.endif
+
+    tst     r0, #2
+.if \granularity == 2 && \preload_early == 1 && \line_size == 32
+    pld     [r3, #32]
+.endif
+    ldrbne  r3, [r1], #1
+    ldrbne  ip, [r1], #1
+    subne   r2, r2, #2
+    orrne   r3, r3, ip, asl #8
+    strhne  r3, [r0], #2
+    b       3b
+.endif
+#endif
 
 1:
     /* Check that both destination and source are word aligned. */
@@ -1888,7 +1931,7 @@ asm_function memcpy
 
 asm_function memcpy
 /*     MEMCPY_VARIANT 1, 32, 16, 16, 128, 1, 0 */
-    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 96, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 128, 1, 0
 .endfunc
 
 #endif
@@ -2070,7 +2113,7 @@ asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
 .endfunc
 
 asm_function memcpy_simple
-    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 1, 0
+    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 128, 1, 0
 .endfunc
 
 #endif
