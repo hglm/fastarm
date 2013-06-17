@@ -1852,6 +1852,23 @@ check_small_size_alignment
 .endif
 
 .if \line_size == 64
+.if \preload_early == 1 && \preload_offset >= 128
+.if \preload_catch_up == 1
+    add     r4, r1, ip
+    add     r3, r3, #(\line_size * 3)
+    cmp     r3, r4
+    addlt   r3, r3, #\line_size
+    bge     12f
+11:
+    cmp     r3, r4
+    pld     [r3, #-\line_size]
+    add     r3, r3, #\line_size
+    blt     11b
+12:
+.else
+    pld     [r3, #(\line_size * 3)]
+.endif
+.endif
     sub     r2, r2, #64
     /* Aligning the main loop branch target seems to help performance a bit. */
     b       5f
@@ -2055,7 +2072,7 @@ check_small_size_alignment
  *
  * Restrictions:
  *     If line_size is 64, write_align must be 32 or 64, block_write_size must be 32, preload_offset
- *     must be a multiple of 64, and preload_catch_up is not ignored (not implemented).
+ *     must be a multiple of 64.
  *     If preload_catch_up is 1 then preload_early must be 1.
  */
 
