@@ -41,11 +41,11 @@
 
 void *armmem_memcpy(void * restrict s1, const void * restrict s2, size_t n);
 
-#define NU_MEMCPY_VARIANTS 39
+#define NU_MEMCPY_VARIANTS 48
 
 #else
 
-#define NU_MEMCPY_VARIANTS 38
+#define NU_MEMCPY_VARIANTS 47
 
 #endif
 
@@ -53,8 +53,8 @@ typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
 memcpy_func_type memcpy_func;
 uint8_t *buffer_alloc, *buffer_chunk, *buffer_page, *buffer_compare;
-int *random_buffer_1024, *random_buffer_1M, *random_buffer_powers_of_two_up_to_65536_power_law;
-int *random_buffer_up_to_65535_power_law;
+int *random_buffer_1024, *random_buffer_1M, *random_buffer_powers_of_two_up_to_4096_power_law;
+int *random_buffer_multiples_of_four_up_to_1024_power_law, *random_buffer_up_to_1023_power_law;
 double test_duration = DEFAULT_TEST_DURATION;
 int memcpy_mask[NU_MEMCPY_VARIANTS];
 
@@ -64,7 +64,16 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "libarmmem memcpy",
 #endif
     "armv5te memcpy",
-    "simplified memcpy with unaligned access for small sizes",
+    "simplified memcpy for sunxi with preload offset of 192, early preload and preload catch up",
+    "simplified memcpy for sunxi with preload offset of 192, early preload and no preload catch up",
+    "simplified memcpy for sunxi with preload offset of 192, early preload, no preload catch up and with small size alignment check",
+    "simplified memcpy for sunxi with preload offset of 256, early preload and preload catch up",
+    "simplified memcpy for sunxi with preload offset of 256, early preload and no preload catch up",
+    "simplified memcpy for rpi with preload offset of 96, early preload and preload catch up",
+    "simplified memcpy for rpi with preload offset of 96, early preload and no preload catch up",
+    "simplified memcpy for rpi with preload offset of 96, early preload and no preload catch up and with small size alignment check",
+    "simplified memcpy for rpi with preload offset of 128, early preload and preload catch up",
+    "simplified memcpy for rpi with preload offset of 128, early preload and no preload catch up",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 8, preload offset 96",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 16, preload offset 96",
     "armv5te non-overfetching memcpy with write alignment of 16 and block write size of 16, preload offset 96 with early preload",
@@ -108,7 +117,16 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     armmem_memcpy,
 #endif
     memcpy_armv5te,
-    memcpy_simple,
+    memcpy_simple_sunxi_preload_early_192,
+    memcpy_simple_sunxi_preload_early_192_no_catch_up,
+    memcpy_simple_sunxi_preload_early_192_no_catch_up_check_small_size_alignment,
+    memcpy_simple_sunxi_preload_early_256,
+    memcpy_simple_sunxi_preload_early_256_no_catch_up,
+    memcpy_simple_rpi_preload_early_96,
+    memcpy_simple_rpi_preload_early_96_no_catch_up,
+    memcpy_simple_rpi_preload_early_96_no_catch_up_check_small_size_alignment,
+    memcpy_simple_rpi_preload_early_128,
+    memcpy_simple_rpi_preload_early_128_no_catch_up,
     memcpy_armv5te_no_overfetch_align_16_block_write_8_preload_96,
     memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_96,
     memcpy_armv5te_no_overfetch_align_16_block_write_16_preload_early_96,
@@ -155,13 +173,19 @@ static double get_time() {
 static void test_mixed_powers_of_two_word_aligned(int i) {
     memcpy_func(buffer_page + random_buffer_1M[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
         buffer_page + random_buffer_1M[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
-        random_buffer_powers_of_two_up_to_65536_power_law[i & (RANDOM_BUFFER_SIZE - 1)]);
+        random_buffer_powers_of_two_up_to_4096_power_law[i & (RANDOM_BUFFER_SIZE - 1)]);
+}
+
+static void test_mixed_power_law_word_aligned(int i) {
+    memcpy_func(buffer_page + random_buffer_1M[(i * 2) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        buffer_page + random_buffer_1M[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)] * 4,
+        random_buffer_multiples_of_four_up_to_1024_power_law[i & (RANDOM_BUFFER_SIZE - 1)]);
 }
 
 static void test_mixed_power_law_unaligned(int i) {
     memcpy_func(buffer_page + random_buffer_1M[(i * 2) & (RANDOM_BUFFER_SIZE - 1)],
         buffer_page + random_buffer_1M[(i * 2 + 1) & (RANDOM_BUFFER_SIZE - 1)],
-        random_buffer_up_to_65535_power_law[i & (RANDOM_BUFFER_SIZE - 1)]);
+        random_buffer_up_to_1023_power_law[i & (RANDOM_BUFFER_SIZE - 1)]);
 }
 
 static void test_unaligned_random_3(int i) {
@@ -494,9 +518,9 @@ static void clear_data_cache() {
 static void do_test(const char *name, void (*test_func)(int), int bytes) {
     int nu_iterations;
     if (bytes >= 1024) 
-        nu_iterations = (256 * 1024 * 1024) / bytes;
+        nu_iterations = (64 * 1024 * 1024) / bytes;
     else if (bytes >= 64)
-        nu_iterations = (32 * 1024 * 1024) / bytes;
+        nu_iterations = (16 * 1024 * 1024) / bytes;
     else
         nu_iterations = 1024 * 1024 / 2;
     /* Warm-up. */
@@ -577,7 +601,7 @@ static void do_validation(int repeat) {
     }
 }
 
-#define NU_TESTS 47
+#define NU_TESTS 48
 
 typedef struct {
     const char *name;
@@ -586,7 +610,9 @@ typedef struct {
 } test_t;
 
 static test_t test[NU_TESTS] = {
-    { "Mixed powers of 2 from 16 to 65536 (power law), word aligned", test_mixed_powers_of_two_word_aligned, 32768 },
+    { "Mixed powers of 2 from 4 to 4096 (power law), word aligned", test_mixed_powers_of_two_word_aligned, 32768 },
+    { "Mixed multiples of 4 from 4 to 1024 (power law), word aligned", test_mixed_power_law_word_aligned, 32768 },
+    { "Mixed from 1 to 1023 (power law), unaligned", test_mixed_power_law_unaligned, 32768 },
     { "4 bytes word aligned", test_aligned_4, 4 },
     { "8 bytes word aligned", test_aligned_8, 8 },
     { "16 bytes word aligned", test_aligned_16, 16 },
@@ -595,7 +621,6 @@ static test_t test[NU_TESTS] = {
     { "64 bytes word aligned", test_aligned_64, 64 },
     { "128 bytes word aligned", test_aligned_128, 128 },
     { "256 bytes word aligned", test_aligned_256, 256 },
-    { "Mixed from 16 to 65535 (power law), unaligned", test_mixed_power_law_unaligned, 32768 },
     { "3 bytes randomly aligned", test_unaligned_random_3, 3 },
     { "8 bytes randomly aligned", test_unaligned_random_8, 8 },
     { "17 bytes randomly aligned", test_unaligned_random_17, 17 },
@@ -780,20 +805,42 @@ int main(int argc, char *argv[]) {
     random_buffer_1M = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
     for (int i = 0; i < RANDOM_BUFFER_SIZE; i++)
         random_buffer_1M[i] = rand() % (1024 * 1024);
-    random_buffer_powers_of_two_up_to_65536_power_law = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
-    int random_buffer_powers_of_two_up_to_65536_power_law_total_bytes = 0;
+    random_buffer_powers_of_two_up_to_4096_power_law = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
+    int random_buffer_powers_of_two_up_to_4096_power_law_total_bytes = 0;
     for (int i = 0; i < RANDOM_BUFFER_SIZE; i++) {
-        random_buffer_powers_of_two_up_to_65536_power_law[i] = 16 << (int)floor(13.0 * pow(1.5, 10.0 * (double)rand() / RAND_MAX) / pow(1.5, 10.0));
-        random_buffer_powers_of_two_up_to_65536_power_law_total_bytes += random_buffer_powers_of_two_up_to_65536_power_law[i];
+        int size = 4 << (int)floor(11.0 * pow(1.5, 10.0 * (double)rand() / RAND_MAX) / pow(1.5, 10.0));
+        random_buffer_powers_of_two_up_to_4096_power_law[i] = size;
+        random_buffer_powers_of_two_up_to_4096_power_law_total_bytes += size;
     }
-    test[0].bytes = random_buffer_powers_of_two_up_to_65536_power_law_total_bytes / RANDOM_BUFFER_SIZE;
-    random_buffer_up_to_65535_power_law = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
-    int random_buffer_up_to_65535_power_law_total_bytes = 0;
+    test[0].bytes = random_buffer_powers_of_two_up_to_4096_power_law_total_bytes / RANDOM_BUFFER_SIZE;
+    random_buffer_multiples_of_four_up_to_1024_power_law = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
+    int random_buffer_multiples_of_four_up_to_1024_power_law_total_bytes = 0;
     for (int i = 0; i < RANDOM_BUFFER_SIZE; i++) {
-        random_buffer_up_to_65535_power_law[i] = 16 + (int)floor(65520.0 * (pow(3.0, 10.0 * (double)rand() / RAND_MAX) - 1.0) / (pow(3.0, 10.0) - 1.0));
-        random_buffer_up_to_65535_power_law_total_bytes += random_buffer_up_to_65535_power_law[i];
+        double f = (double)rand() / RAND_MAX;
+        int size;
+        if (f < 0.9)
+            /* 90% in the range 4 to 256. */
+            size = 4 + ((int)floor(252.0 *
+                (pow(1.0 + f / 0.9, 5.0) - 1.0) / (pow(2.0, 5.0) - 1.0)
+                ) & (~3));
+        else
+            /* 10% in the range 260 to 1024 */
+            size = 4 + ((int)floor((1024 - 260.0) *
+                (pow(1.0 + (f - 0.9) / 0.1, 8.0) - 1.0) / (pow(2.0, 8.0) - 1.0)
+                ) & (~3));
+        random_buffer_multiples_of_four_up_to_1024_power_law[i] = size;
+        random_buffer_multiples_of_four_up_to_1024_power_law_total_bytes += size;
     }
-    test[9].bytes = random_buffer_up_to_65535_power_law_total_bytes / RANDOM_BUFFER_SIZE;
+    test[1].bytes = random_buffer_multiples_of_four_up_to_1024_power_law_total_bytes / RANDOM_BUFFER_SIZE;
+    random_buffer_up_to_1023_power_law = malloc(sizeof(int) * RANDOM_BUFFER_SIZE);
+    int random_buffer_up_to_1023_power_law_total_bytes = 0;
+    for (int i = 0; i < RANDOM_BUFFER_SIZE; i++) {
+        int size;
+        size = 1 + (int)floor(1024.0 * (pow(2.0, 10.0 * (double)rand() / RAND_MAX) - 1.0) / (pow(2.0, 10.0) - 1.0));
+        random_buffer_up_to_1023_power_law[i] = size;
+        random_buffer_up_to_1023_power_law_total_bytes += size;
+    }
+    test[2].bytes = random_buffer_up_to_1023_power_law_total_bytes / RANDOM_BUFFER_SIZE;
 
 
     if (sizeof(size_t) != sizeof(int)) {

@@ -122,6 +122,16 @@ extern void *memcpy_armv5te_overfetch_align_16_block_write_16_preload_early_128(
 extern void *memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192(void *dest,
     const void *src, int n);
 
-extern void *memcpy_simple(void *dest, const void *src, int n);
+extern void *memcpy_simple_sunxi_preload_early_192(void *dest, const void *src, int n);
+extern void *memcpy_simple_sunxi_preload_early_192_no_catch_up(void *dest, const void *src, int n);
+extern void *memcpy_simple_sunxi_preload_early_192_no_catch_up_check_small_size_alignment(void *dest, const void *src, int n);
+extern void *memcpy_simple_sunxi_preload_early_256(void *dest, const void *src, int n);
+extern void *memcpy_simple_sunxi_preload_early_256_no_catch_up(void *dest, const void *src, int n);
+
+extern void *memcpy_simple_rpi_preload_early_96(void *dest, const void *src, int n);
+extern void *memcpy_simple_rpi_preload_early_96_no_catch_up(void *dest, const void *src, int n);
+extern void *memcpy_simple_rpi_preload_early_96_no_catch_up_check_small_size_alignment(void *dest, const void *src, int n);
+extern void *memcpy_simple_rpi_preload_early_128(void *dest, const void *src, int n);
+extern void *memcpy_simple_rpi_preload_early_128_no_catch_up(void *dest, const void *src, int n);
 
 #endif

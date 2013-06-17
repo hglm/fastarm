@@ -1457,7 +1457,7 @@ asm_function memcpy_armv5te
     subne   r2, r2, #8
     strne   r3, [r0], #4
     strne   ip, [r0], #4
-.if \write_align == 32
+.if \write_align >= 32
     tst     r0, #16
     ldrne   r3, [r1]
     beq     31f
@@ -1472,6 +1472,20 @@ asm_function memcpy_armv5te
     str     ip, [r0, #12]
     add     r0, #16
 31:
+.endif
+.if \write_align == 64
+    tst     r0, #32
+    ldmiane r1!, {r3, ip}
+    beq     32f
+    stmia   r0!, {r3, ip}
+    ldmia   r1!, {r3, ip}
+    stmia   r0!, {r3, ip}
+    ldmia   r1!, {r3, ip}
+    stmia   r0!, {r3, ip}
+    ldmia   r1!, {r3, ip}
+    sub     r2, r2, #32
+    stmia   r0!, {r3, ip}
+32:
 .endif
 .endm
 
@@ -1637,9 +1651,9 @@ asm_function memcpy_armv5te
 .endm
 
 
-#define CHECK_SMALL_SIZE_ALIGNMENT
-
-.macro MEMCPY_VARIANT_SIMPLE granularity, line_size, write_align, block_write_size, preload_offset, preload_early, overfetch, custom_write_align
+.macro MEMCPY_VARIANT_SIMPLE granularity, line_size, write_align, block_write_size, \
+preload_offset, preload_catch_up, preload_early, overfetch, custom_write_align, \
+check_small_size_alignment
     cmp     r2, #68
 .if \preload_early == 1
     bic     r3, r1, #(\line_size - 1)
@@ -1656,7 +1670,7 @@ asm_function memcpy_armv5te
      * the number of bytes is > 32. This checks costs a few percent
      * performance for the common word aligned-case.
      */
-#ifdef CHECK_SMALL_SIZE_ALIGNMENT
+.if \check_small_size_alignment == 1
 .if \granularity <= 2
     /* This assumes lt flag is set. */
     tst     r0, #3
@@ -1664,7 +1678,7 @@ asm_function memcpy_armv5te
     cmpne   r2, #32
     bgt     2f
 .endif
-#endif
+.endif
 3:
     tst    r2, #4
     ldrne  r3, [r1], #4
@@ -1696,7 +1710,7 @@ asm_function memcpy_armv5te
     mov    r0, ip
     bx     lr
 
-#ifdef CHECK_SMALL_SIZE_ALIGNMENT
+.if \check_small_size_alignment == 1
 .if \granularity <= 2
 2:
     /* Align the destination. */
@@ -1721,8 +1735,10 @@ asm_function memcpy_armv5te
     strhne  r3, [r0], #2
     b       3b
 .endif
-#endif
+.endif
 
+    /* Aligning this branch target to a 16-byte boundary helps performance a bit. */
+.p2align 4
 1:
     /* Check that both destination and source are word aligned. */
 .if \granularity <= 2
@@ -1793,7 +1809,7 @@ asm_function memcpy_armv5te
 
 .if \line_size == 32
 .if \preload_early == 1 && \preload_offset >= 96
-#ifdef PRELOAD_CATCH_UP
+.if \preload_catch_up == 1
     add     r4, r1, ip
     add     r3, r3, #(\line_size * 3)
     cmp     r3, r4
@@ -1805,9 +1821,9 @@ asm_function memcpy_armv5te
     add     r3, r3, #\line_size
     blt     11b
 12:
-#else
+.else
     pld     [r3, #(\line_size * 3)]
-#endif
+.endif
 .endif
     sub     r2, r2, #32
 5:
@@ -1837,6 +1853,9 @@ asm_function memcpy_armv5te
 
 .if \line_size == 64
     sub     r2, r2, #64
+    /* Aligning the main loop branch target seems to help performance a bit. */
+    b       5f
+.p2align 4
 5:
     /*
      * The main loop for large sizes. Copy 64 bytes at a time
@@ -1990,6 +2009,57 @@ asm_function memcpy_armv5te
 
 .endm
 
+/*
+ * Settings for the MEMCPY_VARIANT_SIMPLE macro
+ *
+ * granularity
+ *     Must be 1, 2 or 4. This value is 1 for normal memcpy, 2 for operations on half-word
+ *     aligned regions such as 16bpp framebuffers/images, and 4 for operations on word aligned
+ *     regions such as 32bpp framebuffers\images.
+ * line_size
+ *     Must be 32 or 64. Defines the cache line size used for preloads. Preloads are only done
+ *     at line_size aligned addresses. When early preload is enabled, the current implementation
+ *     results in more aggressive early preload in the case of a line size of 64.
+ * write_align
+ *     Must be 16, 32, or 64. Defines the write alignment that is applied just before the main loop
+ *     for larger sizes. The main loop processes chunks of line_size bytes at a time.
+ * block_write_size
+ *     Must must be 32, 16. Defines the size of multiple-register load and store instructions that
+ *     are used in the main loop for larger sizes.
+ * preload_offset
+ *     Must be a multiple of line_size. Defines the offset from the current source address at which
+ *     preloads are performed (look-ahead) in the main loop. The real applied offset is derived before
+ *     the start of the main loop by adding the preload offset to the source address and rounding
+ *     down the result to a line_size boundary, and then substracting the source address.
+ * preload_catch_up
+ *     Must be 0 or 1. When early preload is enabled, this enables code just before the main loop
+ *     that performs a series of preloads from just beyond the last early preload to just before
+ *     the first preload in the main loop, filling in the gap.
+ * preload_early
+ *     Must be 0 or 1. When enabled, preload instructions are enabled early in the memcpy function
+ *     to preload the initial part of the source memory region. Early preloads start at the source
+ *     address aligned to a line_size boundary and end at that address + line_size * 2 (three
+ *     early preloads in total).
+ * overfetch
+ *     Must be 1.
+ * custom_write_align
+ *     Must be 0 or 1. Enables RPi-specific write alignment whereby 32-byte alignment is only applied
+ *     if the source address will be located after alignment in the second half of a 32-byte aligned
+ *     chunk; if not, write alignment remains at 16 bytes.
+ * check_small_size_alignment
+ *     Must be 0 or 1. For small sizes less than 68 bytes, unaligned memory access is used to reduce
+ *     overhead in improve performance. However, when both source and destination are unaligned
+ *     this induce a performance penalty. When this option is enabled, beyond a certain size threshold
+ *     (currently set at 32 bytes), the destination is aligned to a word boundary. This may speed up
+ *     unaligned copies in the range of 33 to 67 bytes.
+ *
+ * Restrictions:
+ *     If line_size is 64, write_align must be 32 or 64, block_write_size must be 32, preload_offset
+ *     must be a multiple of 64, and preload_catch_up is not ignored (not implemented).
+ *     If preload_catch_up is 1 then preload_early must be 1.
+ */
+
+
 #if defined(MEMCPY_REPLACEMENT_SUNXI) || defined(MEMCPY_REPLACEMENT_RPI)
 
 #ifdef MEMCPY_REPLACEMENT_SUNXI
@@ -1997,7 +2067,7 @@ asm_function memcpy_armv5te
 /* memcpy replacement for the Allwinner platform. */
 
 asm_function memcpy
-    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 1, 0, 0
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 0, 1, 1, 0, 0
 .endfunc
 
 #endif
@@ -2007,8 +2077,7 @@ asm_function memcpy
 /* memcpy replacement for the RPi platform. */
 
 asm_function memcpy
-/*     MEMCPY_VARIANT 1, 32, 16, 16, 128, 1, 0 */
-    MEMCPY_VARIANT_SIMPLE 1, 32, 16, 16, 128, 1, 0, 0
+    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 16, 128, 1, 1, 1, 1, 1
 .endfunc
 
 #endif
@@ -2189,8 +2258,44 @@ asm_function memcpy_armv5te_overfetch_align_32_block_write_32_preload_early_192
     MEMCPY_VARIANT 1, 32, 32, 32, 192, 1, 1
 .endfunc
 
-asm_function memcpy_simple
-    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 16, 128, 1, 0, 1
+asm_function memcpy_simple_sunxi_preload_early_192
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 1, 1, 1, 0, 0
+.endfunc
+
+asm_function memcpy_simple_sunxi_preload_early_192_no_catch_up
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 0, 1, 1, 0, 0
+.endfunc
+
+asm_function memcpy_simple_sunxi_preload_early_192_no_catch_up_check_small_size_alignment
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 192, 0, 1, 1, 0, 1
+.endfunc
+
+asm_function memcpy_simple_sunxi_preload_early_256
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 256, 1, 1, 1, 0, 0
+.endfunc
+
+asm_function memcpy_simple_sunxi_preload_early_256_no_catch_up
+    MEMCPY_VARIANT_SIMPLE 1, 64, 32, 32, 256, 0, 1, 1, 0, 0
+.endfunc
+
+asm_function memcpy_simple_rpi_preload_early_96
+    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 16, 96, 1, 1, 1, 1, 1
+.endfunc
+
+asm_function memcpy_simple_rpi_preload_early_96_no_catch_up
+    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 16, 96, 0, 1, 1, 1, 0
+.endfunc
+
+asm_function memcpy_simple_rpi_preload_early_96_no_catch_up_check_small_size_alignment
+    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 16, 96, 0, 1, 1, 1, 1
+.endfunc
+
+asm_function memcpy_simple_rpi_preload_early_128
+    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 16, 128, 1, 1, 1, 1, 1
+.endfunc
+
+asm_function memcpy_simple_rpi_preload_early_128_no_catch_up
+    MEMCPY_VARIANT_SIMPLE 1, 32, 32, 16, 128, 0, 1, 1, 1, 1
 .endfunc
 
 #endif
