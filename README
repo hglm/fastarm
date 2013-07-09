@@ -33,7 +33,7 @@ Then run:
 The replacement memcpy shared library will be installed into
 /usr/lib/arm-linux-gnueabihf/ as libfastarm.so. The variant used is currently
 from the new family with line size, write alignment and preload offset
-optimized for the platform.
+optimized for the platform. A memset replacement is also provided.
 
 To enable the use of the replacement memcpy in applications, create or edit
 the file /etc/ld.so.preload so that it contains the line:

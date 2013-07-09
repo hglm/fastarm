@@ -4,7 +4,7 @@
 
 PLATFORM = SUNXI
 THUMBFLAGS = -march=armv7-a -Wa,-march=armv7-a -mthumb -Wa,-mthumb \
- -Wa,-mimplicit-it=always -mno-thumb-interwork -DCONFIG_THUMB
+ -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB
 BENCHMARK_CONFIG_FLAGS = # -DINCLUDE_LIBARMMEM_MEMCPY
 #LIBARMMEM = -larmmem
 CFLAGS = -std=gnu99 -Ofast -Wall $(BENCHMARK_CONFIG_FLAGS)
@@ -31,7 +31,8 @@ libfastarm.so : memcpy_replacement.o
 
 memcpy_replacement.o : new_arm.S
 	$(CC) -c -s -x assembler-with-cpp $(THUMBFLAGS) \
--DMEMCPY_REPLACEMENT_$(PLATFORM) -o memcpy_replacement.o new_arm.S
+-DMEMCPY_REPLACEMENT_$(PLATFORM) -DMEMSET_REPLACEMENT_$(PLATFORM) \
+-o memcpy_replacement.o new_arm.S
 
 clean :
 	rm -f benchmark
@@ -46,7 +47,7 @@ benchmark.o : benchmark.c arm_asm.h
 
 arm_asm.o : arm_asm.S arm_asm.h
 
-new_arm.o : new_arm.S
+new_arm.o : new_arm.S new_arm.h
 
 .c.o : 
 	$(CC) -c $(CFLAGS) $< -o $@

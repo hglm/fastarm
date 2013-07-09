@@ -55,7 +55,7 @@
  * - prefetch_distance is the number of cache lines to look ahead and must be
  *   >= 2.
  * - write_align is the write alignment enforced before the main loop for larger
- *   sizes and must be 0, 16, 32, or 64.
+ *   sizes (word aligned case) and must be 0, 16, 32, or 64.
  * - custom_write_align must be 0 or 1. When enabled, and write_align is 32,
  *   write alignment to 32 bytes will happen if (source_address & 16) == 0, else
  *   write alignment to 16 bytes is applied. This helps performance on armv6
@@ -158,18 +158,18 @@ custom_write_align
 		addlt	r2, r2, #32
 		blt	55f
 
-		pld     [ip, #\line_size]
-		push	{r6-r11}
-		mov	r11, r3
-
                 /*
                  * Assume a preload at aligned base + line_size will
                  * be useful.
                  */
+		pld     [ip, #\line_size]
+		push	{r6-r11}
+		mov	r11, r3
+
 		mov	r4, ip
                 add     r5, r1, #(\prefetch_distance * \line_size)
                 subs    r2, r2, #(\prefetch_distance * \line_size)
-                bic     r3, r5, #(\line_size - 1)
+                bic     r3, r5, #31
                 add     r4, r4, #(2 * \line_size)
                 blt     54f
                 cmp     r4, r3
@@ -392,7 +392,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 strne   ip, [r0], #4
                 tst     r2, #3
                 popeq	{r0}
-                moveq   pc, lr
+                bxeq	lr
 
 	        /* Handle the last up to three bytes. */
 3:		movs    r2, r2, lsl #31
@@ -401,7 +401,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 ldrbne  r3, [r1], #1
                 strbne  r3, [r0], #1
 4:		pop	{r0}
-		mov	pc, lr
+		bx	lr
 
 5:		/*
 		 * Sizes <= SMALL_SIZE_THRESHOLD bytes, both source and
@@ -426,7 +426,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		bge	6b
 		cmp	r2, #0
 		popeq	{r0}
-		moveq	pc, lr
+		bxeq	lr
 		b	3b
 #endif
 
@@ -577,7 +577,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 4:
 #endif
 		pop	{r0}
-		mov	pc, lr
+		bx	lr
 
                 /*
                  * Subroutine that copies a multiple of 4 bytes of size
@@ -619,7 +619,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 ldmia   r1!, {r3, r4}
                 stmia   r0!, {r3, r4}
 .endif
-                mov     pc, lr
+		mov	pc, lr
 
 30:		/*
 		 * Unaligned case. Align the destination.
@@ -784,6 +784,162 @@ asm_function memcpy_new_line_size_32_preload_192_align_32
 
 asm_function memcpy_new_line_size_32_preload_96
 		memcpy_variant 32, 3, 32, 1
+.endfunc
+
+#endif
+
+/*
+ *  Macro for memset replacement.
+ *  write_align must be 0, 8, or 32.
+ */
+
+.macro memset_variant write_align
+		ands	r3, r0, #3
+		mov	ip, r0
+		bne	8f
+
+		/* r0 is now aligned to a word boundary. */
+1:		orr	r1, r1, r1, lsl #8
+		cmp	r2, #8
+		orr	r1, r1, r1, lsl #16
+		blt	5f
+		mov	r3, r1
+
+		cmp	r2, #64
+		push 	{r4}
+		blt	4f
+		mov	r4, r1
+
+.if \write_align > 0
+.if \write_align == 8
+		tst	r0, #4
+		beq	2f
+
+		cmp	r2, #68
+		str	r1, [r0], #4
+	        sub	r2, r2, #4
+		blt     4f
+.else	/* write_align == 32 */
+		tst	r0, #31
+		beq	2f
+		tst     r0, #4
+		strne	r1, [r0], #4
+	        subne	r2, r2, #4
+		tst     r0, #8
+		stmiane r0!, {r1, r3}
+	        subne   r2, r2, #8
+		tst	r0, #16
+		stmiane r0!, {r1, r3}
+	        subne   r2, r2, #16
+	        stmiane r0!, {r1, r3}
+		cmp	r2, #64
+		blt	4f
+.endif
+.endif
+
+2:		push	{r5}
+		mov	r5, r1
+
+3:		stmia	r0!, {r1, r3, r4, r5}
+		subs	r2, r2, #64
+		stmia	r0!, {r1, r3, r4, r5}
+		cmp	r2, #64
+		stmia	r0!, {r1, r3, r4, r5}
+		stmia	r0!, {r1, r3, r4, r5}
+		bge	3b
+
+		pop	{r5}
+		/* Early exit if there are 0 bytes left. */
+	THUMB(	cbz	r2, 7f	)
+	ARM(	teq	r2, #0	)
+	ARM(	beq	7f	)
+
+		/* Handle 8-64 bytes. */
+4:		bic	r4, r2, #7
+		subs	r2, r2, r4
+		rsb	r4, r4, #64
+		/* The stmia instruction is 32-bit for ARM, 16-bit for Thumb2. */
+	THUMB(	lsrs	r4, r4, #2	)
+	ARM(	lsrs	r4, r4, #1	)
+		add	pc, pc, r4
+		nop
+		stmia	r0!, {r1, r3}
+		stmia	r0!, {r1, r3}
+		stmia	r0!, {r1, r3}
+		stmia	r0!, {r1, r3}
+		stmia	r0!, {r1, r3}
+		stmia	r0!, {r1, r3}
+		stmia	r0!, {r1, r3}
+		stmia	r0!, {r1, r3}
+		pop	{r4}
+
+5:		cmp	r2, #4
+		strge	r1, [r0], #4
+		/* Early exit for multiple of 4 size. */
+		ands	r2, r2, #3
+		moveq	r0, ip
+		bxeq	lr
+
+		/*
+		 * At this point there are 1, 2 or 3 bytes,
+		 * and the destination may be unaligned.
+		 */
+6:		cmp	r2, #2
+		strbge	r1, [r0], #1
+		strbge	r1, [r0], #1
+		strbne	r1, [r0], #1
+		mov	r0, ip
+		bx	lr
+
+7:		pop	{r4}
+		mov	r0, ip
+		bx	lr
+
+8:		cmp	r2, #4
+		blt	9f
+		cmp	r3, #2
+		strblt	r1, [r0], #1
+		strble	r1, [r0], #1
+		subs	r2, r2, #4
+		strb	r1, [r0], #1
+		add	r2, r2, r3
+		b	1b
+
+9:		cmp	r2, #0
+		bne	6b
+		bx	lr
+.endm
+
+#if defined(MEMSET_REPLACEMENT_SUNXI) || defined(MEMSET_REPLACEMENT_RPI)
+
+#ifdef MEMSET_REPLACEMENT_SUNXI
+
+asm_function memset
+		memset_variant 0
+.endfunc
+
+#endif
+
+#ifdef MEMSET_REPLACEMENT_RPI
+
+asm_function memset
+		memset_variant 8
+.endfunc
+
+#endif
+
+#else
+
+asm_function memset_new_align_0
+		memset_variant 0
+.endfunc
+
+asm_function memset_new_align_8
+		memset_variant 8
+.endfunc
+
+asm_function memset_new_align_32
+		memset_variant 32
 .endfunc
 
 #endif
