@@ -33,6 +33,7 @@
 #include <math.h>
 
 #include "arm_asm.h"
+#include "new_arm.h"
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
@@ -41,11 +42,11 @@
 
 void *armmem_memcpy(void * restrict s1, const void * restrict s2, size_t n);
 
-#define NU_MEMCPY_VARIANTS 48
+#define NU_MEMCPY_VARIANTS 53
 
 #else
 
-#define NU_MEMCPY_VARIANTS 47
+#define NU_MEMCPY_VARIANTS 52
 
 #endif
 
@@ -64,6 +65,11 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "libarmmem memcpy",
 #endif
     "armv5te memcpy",
+    "new memcpy for sunxi with line size of 64, preload offset of 192",
+    "new memcpy for sunxi with line size of 64, preload offset of 192 and write alignment of 32",
+    "new memcpy for sunxi with line size of 32, preload offset of 192",
+    "new memcpy for sunxi with line size of 32, preload offset of 192 and write alignment of 32",
+    "new memcpy for rpi with preload offset of 96",
     "simplified memcpy for sunxi with preload offset of 192, early preload and preload catch up",
     "simplified memcpy for sunxi with preload offset of 192, early preload and no preload catch up",
     "simplified memcpy for sunxi with preload offset of 192, early preload, no preload catch up and with small size alignment check",
@@ -117,6 +123,11 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     armmem_memcpy,
 #endif
     memcpy_armv5te,
+    memcpy_new_line_size_64_preload_192,
+    memcpy_new_line_size_64_preload_192_align_32,
+    memcpy_new_line_size_32_preload_192,
+    memcpy_new_line_size_32_preload_192_align_32,
+    memcpy_new_line_size_32_preload_96,
     memcpy_simple_sunxi_preload_early_192,
     memcpy_simple_sunxi_preload_early_192_no_catch_up,
     memcpy_simple_sunxi_preload_early_192_no_catch_up_check_small_size_alignment,
@@ -561,11 +572,22 @@ static void fill_buffer(uint8_t *buffer) {
 }
 
 static int compare_buffers(uint8_t *buffer0, uint8_t *buffer1) {
+    int identical = 1;
+    int count = 0;
     for (int i = 0; i < 1024 * 1024 * 16; i++) {
-        if (buffer0[i] != buffer1[i])
-            return 0;
+        if (buffer0[i] != buffer1[i]) {
+            count++;
+	    if (count < 10) {
+                printf("Byte at offset %d (0x%08X) doesn't match.\n",
+                    i, i);
+                identical = 0;
+            }
+	}
     }
-    return 1;
+    if (count >= 10) {
+        printf("(%d more non-matching bytes present.)\n", count - 9);
+    }
+    return identical;
 }
 
 static void memcpy_emulate(uint8_t *dest, uint8_t *src, int size) {
@@ -576,13 +598,21 @@ static void memcpy_emulate(uint8_t *dest, uint8_t *src, int size) {
 static void do_validation(int repeat) {
     int passed = 1;
     for (int i = 0; i < 10 * repeat; i++)  {
-        int size = floor(pow(2.0, (double)rand() * 20.0 / RAND_MAX));
-        int source = rand() % (1024 * 1024 * 16 + 1 - size);
-        int dest;
-        do {
-            dest = rand() % (1024 * 1024 * 16 + 1 - size);
-        }
-        while (dest + size > source && dest < source + size);
+        int size, source, dest;
+            size = floor(pow(2.0, (double)rand() * 20.0 / RAND_MAX));
+            source = rand() % (1024 * 1024 * 16 + 1 - size);
+            int aligned = 0;
+            if ((rand() & 3) == 0) {
+		aligned = 1;
+                source &= ~3;
+                size = (size + 3) & (~3);
+            }
+            do {
+                dest = rand() % (1024 * 1024 * 16 + 1 - size);
+                if (aligned)
+                    dest &= ~3;
+            }
+            while (dest + size > source && dest < source + size);
         printf("Testing (source offset = 0x%08X, destination offset = 0x%08X, size = %d).\n",
                 source, dest, size);
         fflush(stdout);

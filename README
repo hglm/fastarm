@@ -4,15 +4,18 @@ This toolkit contains a set of fast memcpy variants for ARM platforms.
 They uses the standard register file, VFP or NEON registers are not
 used.
 
-Two basic families are provided: a simpler one that is optimized for
-common cases and does possible unaligned memory access for small sizes;
-and a more complicated one that always uses aligned memory access and
-can be configured to "catch-up" early prefetches with the defined preload
-offset and not to overfetch beyond the source region.
+Several basic families of variants are provided; the latest ones are
+the "new memcpy" variants which are the default for memcpy replacement,
+which generally do not overfetch beyond the source region but do
+possible unaligned memory access for small sizes.
 
 To compile the benchmark program, run 'make'. This will compile in a
 plethora of variants with different preload strategies, block sizes,
 alignment etc.
+
+A benchmark program to compare various memcpy variants is provided. Try
+something like "./benchmark --memcpy ac --all". (Use --memcpy ag on the
+Raspberry Pi platform).
 
 To compile a memcpy replacement library, set PLATFORM to one of the
 following values in the Makefile:
@@ -20,13 +23,16 @@ following values in the Makefile:
     SUNXI    Allwinner platform (tested on A10).
     RPI      Raspberry Pi
 
-and run:
+Optionally disable Thumb2 mode compilation by commenting out the THUMBFLAGS
+definition. It must be disabled on the Raspberry Pi.
+
+Then run:
 
     sudo make install_memcpy_replacement
 
 The replacement memcpy shared library will be installed into
 /usr/lib/arm-linux-gnueabihf/ as libfastarm.so. The variant used is currently
-from the simpler family with line size, write alignment and preload offset
+from the new family with line size, write alignment and preload offset
 optimized for the platform.
 
 To enable the use of the replacement memcpy in applications, create or edit

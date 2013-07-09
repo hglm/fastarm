@@ -1,7 +1,10 @@
 # PLATFORM must be SUNXI or RPI and is used to select the memcpy
 # variant used in the memcpy replacement library (libfastarm.so)
+# Uncomment the THUMBFLAGS definition to compile in ARM mode as opposed to Thumb2
 
 PLATFORM = SUNXI
+THUMBFLAGS = -march=armv7-a -Wa,-march=armv7-a -mthumb -Wa,-mthumb \
+ -Wa,-mimplicit-it=always -mno-thumb-interwork -DCONFIG_THUMB
 BENCHMARK_CONFIG_FLAGS = # -DINCLUDE_LIBARMMEM_MEMCPY
 #LIBARMMEM = -larmmem
 CFLAGS = -std=gnu99 -Ofast -Wall $(BENCHMARK_CONFIG_FLAGS)
@@ -9,11 +12,11 @@ PCFLAGS = -std=gnu99 -O -Wall $(BENCHMARK_CONFIG_FLAGS) -pg -ggdb
 
 all : benchmark libfastarm.so
 
-benchmark : benchmark.o arm_asm.o
-	$(CC) $(CFLAGS) benchmark.o arm_asm.o -o benchmark -lm -lrt $(LIBARMMEM)
+benchmark : benchmark.o arm_asm.o new_arm.o
+	$(CC) $(CFLAGS) benchmark.o arm_asm.o new_arm.o -o benchmark -lm -lrt $(LIBARMMEM)
 
 benchmarkp : benchmark.c arm_asm.S
-	$(CC) $(PCFLAGS) benchmark.c arm_asm.S -o benchmarkp -lc -lm -lrt $(LIBARMMEM)
+	$(CC) $(PCFLAGS) benchmark.c arm_asm.S new_arm.S -o benchmarkp -lc -lm -lrt $(LIBARMMEM)
 
 install_memcpy_replacement : libfastarm.so
 	install -m 0755 libfastarm.so /usr/lib/arm-linux-gnueabihf/libfastarm.so
@@ -26,8 +29,9 @@ install_memcpy_replacement : libfastarm.so
 libfastarm.so : memcpy_replacement.o
 	$(CC) -o libfastarm.so -shared memcpy_replacement.o
 
-memcpy_replacement.o : arm_asm.S
-	$(CC) -c -s -x assembler-with-cpp -DMEMCPY_REPLACEMENT_$(PLATFORM) -o memcpy_replacement.o arm_asm.S
+memcpy_replacement.o : new_arm.S
+	$(CC) -c -s -x assembler-with-cpp $(THUMBFLAGS) \
+-DMEMCPY_REPLACEMENT_$(PLATFORM) -o memcpy_replacement.o new_arm.S
 
 clean :
 	rm -f benchmark
@@ -42,11 +46,13 @@ benchmark.o : benchmark.c arm_asm.h
 
 arm_asm.o : arm_asm.S arm_asm.h
 
+new_arm.o : new_arm.S
+
 .c.o : 
 	$(CC) -c $(CFLAGS) $< -o $@
 
 .S.o :
-	$(CC) -c -s $(CFLAGS) $< -o $@
+	$(CC) -c -s $(CFLAGS) $(THUMBFLAGS) $< -o $@
 
 .c.s :
 	$(CC) -S $(CFLAGS) $< -o $@
