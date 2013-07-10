@@ -42,11 +42,11 @@
 
 void *armmem_memcpy(void * restrict s1, const void * restrict s2, size_t n);
 
-#define NU_MEMCPY_VARIANTS 53
+#define NU_MEMCPY_VARIANTS 55
 
 #else
 
-#define NU_MEMCPY_VARIANTS 52
+#define NU_MEMCPY_VARIANTS 54
 
 #endif
 
@@ -67,9 +67,11 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "armv5te memcpy",
     "new memcpy for sunxi with line size of 64, preload offset of 192",
     "new memcpy for sunxi with line size of 64, preload offset of 192 and write alignment of 32",
+    "new memcpy for sunxi with line size of 64, preload offset of 192 and aligned access",
     "new memcpy for sunxi with line size of 32, preload offset of 192",
     "new memcpy for sunxi with line size of 32, preload offset of 192 and write alignment of 32",
-    "new memcpy for rpi with preload offset of 96",
+    "new memcpy for rpi with preload offset of 96, custom write alignment of 32",
+    "new memcpy for rpi with preload offset of 96, custom write alignment of 32 and aligned access",
     "simplified memcpy for sunxi with preload offset of 192, early preload and preload catch up",
     "simplified memcpy for sunxi with preload offset of 192, early preload and no preload catch up",
     "simplified memcpy for sunxi with preload offset of 192, early preload, no preload catch up and with small size alignment check",
@@ -125,9 +127,11 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy_armv5te,
     memcpy_new_line_size_64_preload_192,
     memcpy_new_line_size_64_preload_192_align_32,
+    memcpy_new_line_size_64_preload_192_aligned_access,
     memcpy_new_line_size_32_preload_192,
     memcpy_new_line_size_32_preload_192_align_32,
     memcpy_new_line_size_32_preload_96,
+    memcpy_new_line_size_32_preload_96_aligned_access,
     memcpy_simple_sunxi_preload_early_192,
     memcpy_simple_sunxi_preload_early_192_no_catch_up,
     memcpy_simple_sunxi_preload_early_192_no_catch_up_check_small_size_alignment,

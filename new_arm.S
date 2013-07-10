@@ -49,7 +49,8 @@
 
 /*
  * The following memcpy implementation is optimized with a fast path
- * for common, word aligned cases and may use unaligned access for small sizes.
+ * for common, word aligned cases and optionally use unaligned access for
+ * small sizes.
  *
  * - line_size is the cache line size used for prefetches. Must be 64 or 32.
  * - prefetch_distance is the number of cache lines to look ahead and must be
@@ -60,6 +61,9 @@
  *   write alignment to 32 bytes will happen if (source_address & 16) == 0, else
  *   write alignment to 16 bytes is applied. This helps performance on armv6
  *   platforms like Raspberry Pi.
+ * - aligned_access must be 0 or 1. When enabled, no unaligned memory accesses
+ *   will occur. Both small size tresholds for unaligned access are not used
+ *   in this case.
  */
 
 /* The threshold size for using the fast path for the word-aligned case. */
@@ -91,6 +95,7 @@
 // #define BOTH_UNALIGNED_SMALL_SIZE_THRESHOLD 0
 
 /*
+ * EARLY_PREFETCHES is used in the fast path implementation.
  * The optimal value for EARLY_PREFETCHES was determined empirically.
  * It is equal to prefetch_distance + 1 for line_size 32.
  *            and prefetch_distance - 1 for line_size 64.
@@ -112,8 +117,8 @@
 #ifdef CONFIG_THUMB
                 /*
                  * When Thumb2 mode is enabled, the ldmia/stmia instructions
-                 * will be 16 bits, and the preload instruction will be
-                 * 32 bits, so we only need one 32-bit wide nop instruction
+                 * will be 16-bit, and the preload instruction will be
+                 * 32-bit, so we only need one 32-bit wide nop instruction
                  * when there's no preload, for a total size of two words.
                  */
 .if \bytes_to_go >= (EARLY_PREFETCHES * \line_size) && \
@@ -147,16 +152,15 @@
 /* Helper macro implementing unaligned copy. */
 
 .macro unaligned_copy shift, line_size, prefetch_distance, write_align, \
-custom_write_align
+custom_write_align, aligned_access
 		/*
 		 * ip is the aligned source base address.
 		 * r3 is a word of data from the source.
 		 */
+		cmp	r2, #32
 		push 	{r5}
-
-		subs	r2, r2, #32
-		addlt	r2, r2, #32
 		blt	55f
+		subs	r2, r2, #32
 
                 /*
                  * Assume a preload at aligned base + line_size will
@@ -236,27 +240,57 @@ custom_write_align
 57:		pop	{r5}
 		pop	{r4}
 		subs	r1, r1, #((32 - \shift) / 8)
+.if \aligned_access == 1
+		b	7b
+.else
 		b	3b
+.endif
 .endm
 
 
 /* The main memcpy function macro. */
 
 .macro memcpy_variant line_size, prefetch_distance, write_align, \
-custom_write_align
+custom_write_align, aligned_access
 
+.if \aligned_access == 1
+		cmp	r2, #3
+.else
 NO_FAST_PATH(	cmp	r2, #3	)
+.endif
 		orr	r3, r0, r1
+.if \aligned_access == 1
+		push	{r0}
+		ble	7f
+.else
 NO_FAST_PATH(	push	{r0}	)
 NO_FAST_PATH(	ble	3f	)
+.endif
 		bic	ip, r1, #(\line_size - 1)
 		tst	r3, #3
 		pld	[ip]
+.if \aligned_access == 1
+FAST_PATH(	bne	30f	)
+.else
 FAST_PATH(	push	{r0}	)
 FAST_PATH(	bne	7f	)	/* Unaligned source or destination. */
+.endif
 FAST_PATH(	cmp	r2, #FAST_PATH_THRESHOLD )
 FAST_PATH(	bgt     10f	)
 NO_FAST_PATH(	bne	30f	)
+#if FAST_PATH_THRESHOLD == 0
+		/*
+		 * When the fast path is disabled, check whether there are
+		 * enough bytes for alignment, and jump to the main handling
+		 * code for larger sizes.
+		 */
+.if \write_align > 0
+ 		cmp	r2, #(\write_align - 4)
+		bge	10f
+.endif
+		push	{r4}
+		b	18f
+#endif
 
 		/*
 		 * Fast path for aligned copies of size <= FAST_PATH_THRESHOLD.
@@ -381,12 +415,19 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		 * in double-word loads and stored so we have to use
 		 * single-word operations.
 		 */
+.if \aligned_access == 0
 	ARM(	ldrcs	r3, [r1], #4	)
 	ARM(	ldrcs	ip, [r1], #4	)
 	ARM(	strcs	r3, [r0], #4	)
 	ARM(	strcs	ip, [r0], #4	)
 	THUMB(	ldrdcs  r3, ip, [r1], #8	)
 	THUMB(	strdcs  r3, ip, [r0], #8	)
+.else
+		ldrcs	r3, [r1], #4
+		ldrcs	ip, [r1], #4
+		strcs	r3, [r0], #4
+		strcs	ip, [r0], #4
+.endif
                 tst     r2, #4
                 ldrne   ip, [r1], #4
                 strne   ip, [r0], #4
@@ -394,7 +435,11 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 popeq	{r0}
                 bxeq	lr
 
-	        /* Handle the last up to three bytes. */
+	        /*
+		 * Handle the last up to three bytes. Unaligned access
+		 * make take place if source or destination is not
+		 * half-word aligned.
+		 */
 3:		movs    r2, r2, lsl #31
                 ldrhcs  r3, [r1], #2
                 strhcs  r3, [r0], #2
@@ -411,7 +456,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		cmp	r2, #8		/* cs if r2 >= 8. */
 		b	2b
 #else
-		tst	r2, #4
+101:		tst	r2, #4
 		ldrne	r3, [r1], #4
 		subne	r2, r2, #4
 		strne	r3, [r0], #4
@@ -430,6 +475,26 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		b	3b
 #endif
 
+#endif	/* FAST_PATH_THRESHOLD > 0 */
+
+.if \aligned_access == 1
+		/*
+		 * Handle the last up to three bytes avoiding
+		 * unaligned memory access.
+		 */
+7:		movs    r2, r2, lsl #31
+                ldrbcs  r3, [r1], #1
+                ldrbcs  ip, [r1], #1
+                strbcs  r3, [r0], #1
+                strbcs  ip, [r0], #1
+                ldrbne  r3, [r1], #1
+                strbne  r3, [r0], #1
+		pop	{r0}
+		bx	lr
+.endif
+
+#if FAST_PATH_THRESHOLD > 0
+.if \aligned_access == 0
 7:		/*
 		 * Unaligned source or destination. There are seperate small
 		 * size thresholds for when both source and destination are
@@ -443,6 +508,10 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		bgt	30f
 
 		/* Small sizes, unaligned case. Use single word load/stores. */
+#if SMALL_SIZE_THRESHOLD >= 16
+		/* Use the identical code path already defined above. */
+		b	101b
+#else
 		tst	r2, #4
 		ldrne	r3, [r1], #4
 		subne	r2, r2, #4
@@ -457,6 +526,8 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		str	ip, [r0], #4
 		bge	8b
 		b	3b
+#endif
+.endif
 #endif		/* FAST_PATH_THRESHOLD > 0 */
 
 10:		/*
@@ -467,7 +538,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		 * ip is the line_sized aligned source address for preloads.
 		 */
 
-.if \write_align >= 16
+.if \write_align > 0
 		ands	r3, r0, #(\write_align - 1)
 		push	{r4}
 		rsb	r3, r3, #\write_align
@@ -488,11 +559,12 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		push	{r4}
 .endif
 
-		subs	r2, r2, #\line_size
+18:
 .if (FAST_PATH_THRESHOLD - (\write_align - 4)) < \line_size
-		addlt	r2, r2, #\line_size
+		cmp	r2, #\line_size
 		blt	15f
 .endif
+		subs	r2, r2, #\line_size
 
 16:		/*
 		 * This is the entry-point when source and destination were
@@ -557,9 +629,18 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		pop	{r5-r11}
 
 15:		ands	r3, r2, #60
+.if \write_align == 0
+		/*
+		 * When write alignment is disabled, the subroutine will
+		 * only be called once, so branch without linking.
+		 */
+		bne	20f
+19:
+.else
 		mov	ip, lr
 		blne	20f
 		mov	lr, ip
+.endif
 		pop	{r4}
 #if FAST_PATH_THRESHOLD > 0
 		cmp	r2, #0
@@ -619,13 +700,17 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 ldmia   r1!, {r3, r4}
                 stmia   r0!, {r3, r4}
 .endif
+.if \write_align == 0
+		b	19b
+.else
 		mov	pc, lr
+.endif
 
 30:		/*
 		 * Unaligned case. Align the destination.
 		 * Number of bytes is > UNALIGNED_SMALL_SIZE_THRESHOLD.
-		 * Note: This may use aligned access.
-		 * ip is the line_size ligned source address for preloads.
+		 * Note: This may use unaligned access.
+		 * ip is the line_size aligned source address for preloads.
 		 */
 		ands	r3, r0, #3
 		push	{r4}
@@ -633,21 +718,33 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		beq	40f	/* Destination is aligned but source is not. */
 		/* Align the destination. */
 		cmp	r3, #2
+.if \aligned_access == 1
+                ldrble  r4, [r1], #1
+		ldrble	r3, [r1], #1
+		suble	r2, r2, #2
+		strble	r4, [r0], #1
+		strble	r3, [r0], #1
+.else
                 ldrhle  r4, [r1], #2
 		suble	r2, r2, #2
 		strhle	r4, [r0], #2
+.endif
 		ldrbne	r4, [r1], #1
 		subne	r2, r2, #1
 		strbne	r4, [r0], #1
 		ands	r3, r1, #3
 		bne	40f	/* Destination is aligned but source is not. */
 
-#if 0
+#if 0 && FAST_PATH_THRESHOLD > 0
 		/*
 		 * Source and destination are now aligned.
 		 * Now recreate the situation of a word-aligned memcpy
 		 * with the current source and destination,
 		 * which may require an extra preload instruction.
+		 *
+		 * This path is currently disabled disabled in favour
+		 * of the one below this which does write alignment and
+		 * jumps into the main loop for larger sizes.
 		 */
 		bic	r3, r1, #(\line_size - 1)
 		pop	{r4}
@@ -665,7 +762,8 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		 * Recreate the fast path small size check here,
 		 * but only if it necessary.
 		 */
-.if (BOTH_UNALIGNED_SMALL_SIZE_THRESHOLD + 1 - 3) <= SMALL_SIZE_THRESHOLD
+.if (BOTH_UNALIGNED_SMALL_SIZE_THRESHOLD + 1 - 3) <= SMALL_SIZE_THRESHOLD ||
+\aligned_access == 1
 		cmp	r2, #SMALL_SIZE_THRESHOLD
                 pld     [ip, #\line_size]
 		/* Jump for small sizes <= SMALL_SIZE_THRESHOLD bytes. */
@@ -681,8 +779,9 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		 * Source and destination are now aligned. Check carefully
 		 * whether there are enough bytes to do alignment.
 		 */
-.if \write_align >= 16
-.if (BOTH_UNALIGNED_SMALL_SIZE_THRESHOLD + 1 - 3) < (\write_align - 4)
+.if \write_align > 0
+.if (BOTH_UNALIGNED_SMALL_SIZE_THRESHOLD + 1 - 3) < (\write_align - 4) \
+|| \aligned_access == 1
 		cmp	r2, #(\write_align - 4)
 		blt	31f
 .endif
@@ -707,21 +806,24 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		 * Check whether there are enough bytes to do one iteration
 		 * of the main loop.
 		 */
-		subs	r2, r2, #\line_size
-.if (BOTH_UNALIGNED_SMALL_SIZE_THRESHOLD + 1 - 3 - (\write_align - 4)) < \line_size
-		addlt	r2, r2, #\line_size
+.if (BOTH_UNALIGNED_SMALL_SIZE_THRESHOLD + 1 - 3 - (\write_align - 4)) < \line_size \
+|| \aligned_access == 1
+		cmp	r2, #\line_size
 		blt	15b
 .endif
+		subs	r2, r2, #\line_size
 .else
 		/*
 		 * No write alignment. Only have to check for enough bytes to
 		 * do one iteration of the main loop.
 		 */
-		subs	r2, r2, #\line_size
-.if (BOTH_UNALIGNED_SMALL_SIZE_THRESHOLD + 1 - 3) < \line_size
-		addlt	r2, r2, #\line_size
+
+.if (BOTH_UNALIGNED_SMALL_SIZE_THRESHOLD + 1 - 3) < \line_size \
+|| \aligned_access == 1
+		cmp	r2, #\line_size
 		blt	15b
 .endif
+		subs	r2, r2, #\line_size
 .endif
 		b	16b
 #endif
@@ -736,13 +838,13 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		bgt	42f
 
 		unaligned_copy 8, \line_size, \prefetch_distance, \
-			\write_align, \custom_write_align
+			\write_align, \custom_write_align, \aligned_access
 
 41:		unaligned_copy 16, \line_size, \prefetch_distance, \
-			\write_align, \custom_write_align
+			\write_align, \custom_write_align, \aligned_access
 
 42:		unaligned_copy 24, \line_size, \prefetch_distance, \
-			\write_align, \custom_write_align
+			\write_align, \custom_write_align, \aligned_access
 
 .endm
 
@@ -751,7 +853,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 #ifdef MEMCPY_REPLACEMENT_SUNXI
 
 asm_function memcpy
-		memcpy_variant 64, 3, 0, 0
+		memcpy_variant 64, 3, 0, 0, 0
 .endfunc
 
 #endif
@@ -759,7 +861,7 @@ asm_function memcpy
 #ifdef MEMCPY_REPLACEMENT_RPI
 
 asm_function memcpy
-		memcpy_variant 32, 3, 32, 1
+		memcpy_variant 32, 3, 32, 1, 0
 .endfunc
 
 #endif
@@ -767,23 +869,31 @@ asm_function memcpy
 #else
 
 asm_function memcpy_new_line_size_64_preload_192
-		memcpy_variant 64, 3, 0, 0
+		memcpy_variant 64, 3, 0, 0, 0
 .endfunc
 
 asm_function memcpy_new_line_size_64_preload_192_align_32
-		memcpy_variant 64, 3, 32, 0
+		memcpy_variant 64, 3, 32, 0, 0
+.endfunc
+
+asm_function memcpy_new_line_size_64_preload_192_aligned_access
+		memcpy_variant 64, 3, 0, 0, 1
 .endfunc
 
 asm_function memcpy_new_line_size_32_preload_192
-		memcpy_variant 32, 6, 0, 0
+		memcpy_variant 32, 6, 0, 0, 0
 .endfunc
 
 asm_function memcpy_new_line_size_32_preload_192_align_32
-		memcpy_variant 32, 6, 32, 0
+		memcpy_variant 32, 6, 32, 0, 0
 .endfunc
 
 asm_function memcpy_new_line_size_32_preload_96
-		memcpy_variant 32, 3, 32, 1
+		memcpy_variant 32, 3, 32, 1, 0
+.endfunc
+
+asm_function memcpy_new_line_size_32_preload_96_aligned_access
+		memcpy_variant 32, 3, 32, 1, 1
 .endfunc
 
 #endif

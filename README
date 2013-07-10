@@ -6,15 +6,19 @@ used.
 
 Several basic families of variants are provided; the latest ones are
 the "new memcpy" variants which are the default for memcpy replacement,
-which generally do not overfetch beyond the source region but do
-possible unaligned memory access for small sizes.
+which generally do not overfetch beyond the source region and can be
+configured to use unaligned memory access for small sizes, or to use
+strictly aligned memory access. This family can also be configured to
+include a fast path for smaller sizes (this is the default), disabling
+this results in smaller code size at the expense of worse performance
+for small sizes.
 
 To compile the benchmark program, run 'make'. This will compile in a
 plethora of variants with different preload strategies, block sizes,
 alignment etc.
 
 A benchmark program to compare various memcpy variants is provided. Try
-something like "./benchmark --memcpy ac --all". (Use --memcpy ag on the
+something like "./benchmark --memcpy ac --all". (Use --memcpy ah on the
 Raspberry Pi platform).
 
 To compile a memcpy replacement library, set PLATFORM to one of the

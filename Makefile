@@ -40,6 +40,7 @@ clean :
 	rm -f benchmarkp
 	rm -f arm_asm.s
 	rm -f arm_asm.o
+	rm -f new_arm.o
 	rm -f memcpy_replacement.o
 	rm -f libfastarm.so
 
