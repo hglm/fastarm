@@ -157,10 +157,39 @@ custom_write_align, aligned_access
 		 * ip is the aligned source base address.
 		 * r3 is a word of data from the source.
 		 */
+.if \write_align > 0
+		cmp	r2, #(32 + \write_align - 4)
+.else
 		cmp	r2, #32
+.endif
 		push 	{r5}
 		blt	55f
 		subs	r2, r2, #32
+
+		/* Handle write alignment. */
+.if \write_align > 0
+.if \write_align == 8
+		tst	r0, #4
+	        mov	r4, r3, lsr #\shift
+                ldrne	r3, [r1], #4
+		subne	r2, r2, #4
+                orrne   r4, r4, r3, lsl #(32 - \shift)
+                strne   r4, [r0], #4
+.else
+		ands	r5, r0, #(\write_align - 1)
+		rsb	r5, r5, #\write_align
+		beq	59f
+		sub	r2, r2, r5
+
+58:             movs    r4, r3, lsr #\shift
+                ldr	r3, [r1], #4
+                subs    r5, r5, #4
+                orr     r4, r4, r3, lsl #(32 - \shift)
+                str     r4, [r0], #4
+                bgt     58b
+59:
+.endif
+.endif
 
                 /*
                  * Assume a preload at aligned base + line_size will
@@ -538,7 +567,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		 * ip is the line_sized aligned source address for preloads.
 		 */
 
-.if \write_align > 0
+.if \write_align >= 16
 		ands	r3, r0, #(\write_align - 1)
 		push	{r4}
 		rsb	r3, r3, #\write_align
@@ -555,6 +584,16 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		bl	20f
 		pop	{lr}
 17:
+.elseif \write_align == 8
+		/*
+		 * For write alignment of 8, it is quickest to do a simple
+		 * conditional load/store.
+		 */
+		tst	r0, #4
+		push	{r4}
+		ldrne	r3, [r1], #4
+		subne	r2, r2, #4
+		strne	r3, [r0], #4
 .else
 		push	{r4}
 .endif
@@ -629,10 +668,11 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		pop	{r5-r11}
 
 15:		ands	r3, r2, #60
-.if \write_align == 0
+.if \write_align <= 8
 		/*
-		 * When write alignment is disabled, the subroutine will
-		 * only be called once, so branch without linking.
+		 * When the subroutine is not used for write alignment, the
+		 * subroutine will only be called once, so branch without
+		 * linking.
 		 */
 		bne	20f
 19:
@@ -700,7 +740,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 ldmia   r1!, {r3, r4}
                 stmia   r0!, {r3, r4}
 .endif
-.if \write_align == 0
+.if \write_align <= 8
 		b	19b
 .else
 		mov	pc, lr
@@ -785,6 +825,16 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		cmp	r2, #(\write_align - 4)
 		blt	31f
 .endif
+.if \write_align == 8
+		/*
+		 * For write alignment of 8, it is quickest to do a simple
+		 * conditional load/store.
+		 */
+		tst	r0, #4
+		ldrne	r3, [r1], #4
+		subne	r2, r2, #4
+		strne	r3, [r0], #4
+.else
 		ands	r3, r0, #(\write_align - 1)
 		rsb	r3, r3, #\write_align
 		beq	31f
@@ -801,6 +851,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		push	{lr}
 		bl	20b
 		pop	{lr}
+.endif
 
 31:		/*
 		 * Check whether there are enough bytes to do one iteration
@@ -861,7 +912,7 @@ asm_function memcpy
 #ifdef MEMCPY_REPLACEMENT_RPI
 
 asm_function memcpy
-		memcpy_variant 32, 3, 32, 1, 0
+		memcpy_variant 32, 3, 8, 0, 0
 .endfunc
 
 #endif
@@ -889,11 +940,11 @@ asm_function memcpy_new_line_size_32_preload_192_align_32
 .endfunc
 
 asm_function memcpy_new_line_size_32_preload_96
-		memcpy_variant 32, 3, 32, 1, 0
+		memcpy_variant 32, 3, 8, 0, 0
 .endfunc
 
 asm_function memcpy_new_line_size_32_preload_96_aligned_access
-		memcpy_variant 32, 3, 32, 1, 1
+		memcpy_variant 32, 3, 8, 0, 1
 .endfunc
 
 #endif
@@ -1033,7 +1084,7 @@ asm_function memset
 #ifdef MEMSET_REPLACEMENT_RPI
 
 asm_function memset
-		memset_variant 8
+		memset_variant 32
 .endfunc
 
 #endif
