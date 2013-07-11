@@ -57,10 +57,6 @@
  *   >= 2.
  * - write_align is the write alignment enforced before the main loop for larger
  *   sizes (word aligned case) and must be 0, 16, 32, or 64.
- * - custom_write_align must be 0 or 1. When enabled, and write_align is 32,
- *   write alignment to 32 bytes will happen if (source_address & 16) == 0, else
- *   write alignment to 16 bytes is applied. This helps performance on armv6
- *   platforms like Raspberry Pi.
  * - aligned_access must be 0 or 1. When enabled, no unaligned memory accesses
  *   will occur. Both small size tresholds for unaligned access are not used
  *   in this case.
@@ -152,7 +148,7 @@
 /* Helper macro implementing unaligned copy. */
 
 .macro unaligned_copy shift, line_size, prefetch_distance, write_align, \
-custom_write_align, aligned_access
+aligned_access
 		/*
 		 * ip is the aligned source base address.
 		 * r3 is a word of data from the source.
@@ -280,7 +276,7 @@ custom_write_align, aligned_access
 /* The main memcpy function macro. */
 
 .macro memcpy_variant line_size, prefetch_distance, write_align, \
-custom_write_align, aligned_access
+aligned_access
 
 .if \aligned_access == 1
 		cmp	r2, #3
@@ -571,14 +567,6 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		ands	r3, r0, #(\write_align - 1)
 		push	{r4}
 		rsb	r3, r3, #\write_align
-.if \write_align == 32 && \custom_write_align == 1
-		/*
-		 * When custom_write_align is set, if (source_address & 16) != 0
-		 * align to a 16-byte boundary instead of 32-byte.
-		 */
-		tst	r1, #16
-		andsne	r3, r3, #15
-.endif
 		beq	17f
 		push	{lr}
 		bl	20f
@@ -838,16 +826,6 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		ands	r3, r0, #(\write_align - 1)
 		rsb	r3, r3, #\write_align
 		beq	31f
-.if \write_align == 32 && \custom_write_align == 1
-		/*
-		 * When custom_write_align is set, if (source_address & 16) != 0
-		 * align to a 16-byte boundary instead of 32-byte.
-		 */
-		tst	r1, #16
-		andne	r3, r3, #15
-		cmp	r3, #0
-		beq	31f
-.endif
 		push	{lr}
 		bl	20b
 		pop	{lr}
@@ -889,13 +867,13 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		bgt	42f
 
 		unaligned_copy 8, \line_size, \prefetch_distance, \
-			\write_align, \custom_write_align, \aligned_access
+			\write_align, \aligned_access
 
 41:		unaligned_copy 16, \line_size, \prefetch_distance, \
-			\write_align, \custom_write_align, \aligned_access
+			\write_align, \aligned_access
 
 42:		unaligned_copy 24, \line_size, \prefetch_distance, \
-			\write_align, \custom_write_align, \aligned_access
+			\write_align, \aligned_access
 
 .endm
 
@@ -904,7 +882,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 #ifdef MEMCPY_REPLACEMENT_SUNXI
 
 asm_function memcpy
-		memcpy_variant 64, 3, 0, 0, 0
+		memcpy_variant 64, 3, 0, 0
 .endfunc
 
 #endif
@@ -912,7 +890,7 @@ asm_function memcpy
 #ifdef MEMCPY_REPLACEMENT_RPI
 
 asm_function memcpy
-		memcpy_variant 32, 3, 8, 0, 0
+		memcpy_variant 32, 3, 8, 0
 .endfunc
 
 #endif
@@ -920,31 +898,31 @@ asm_function memcpy
 #else
 
 asm_function memcpy_new_line_size_64_preload_192
-		memcpy_variant 64, 3, 0, 0, 0
+		memcpy_variant 64, 3, 0, 0
 .endfunc
 
 asm_function memcpy_new_line_size_64_preload_192_align_32
-		memcpy_variant 64, 3, 32, 0, 0
+		memcpy_variant 64, 3, 32, 0
 .endfunc
 
 asm_function memcpy_new_line_size_64_preload_192_aligned_access
-		memcpy_variant 64, 3, 0, 0, 1
+		memcpy_variant 64, 3, 0, 1
 .endfunc
 
 asm_function memcpy_new_line_size_32_preload_192
-		memcpy_variant 32, 6, 0, 0, 0
+		memcpy_variant 32, 6, 0, 0
 .endfunc
 
 asm_function memcpy_new_line_size_32_preload_192_align_32
-		memcpy_variant 32, 6, 32, 0, 0
+		memcpy_variant 32, 6, 32, 0
 .endfunc
 
 asm_function memcpy_new_line_size_32_preload_96
-		memcpy_variant 32, 3, 8, 0, 0
+		memcpy_variant 32, 3, 8, 0
 .endfunc
 
 asm_function memcpy_new_line_size_32_preload_96_aligned_access
-		memcpy_variant 32, 3, 8, 0, 1
+		memcpy_variant 32, 3, 8, 1
 .endfunc
 
 #endif
