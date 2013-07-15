@@ -885,24 +885,28 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
  *
  * - line_size is the cache line size used for prefetches. Must be 64 or 32.
  * - prefetch_distance is the number of cache lines to look ahead and must be
- *   >= 2, or 0 to disable prefetching altogether.
+ *   >= 2, or 0 to disable prefetching in the main copying loop.
+ * - early_prefetch indicates whether to perform early preloads. Must be 0 or 1.
+ *   When prefetch_distance > 0, early_prefetch should be 1. To remove all PLD
+ *   instructions altogether, set both prefetch_distance and early_prefetch
+ *   to 0.
  */
 
-.macro neon_memcpy_variant line_size, prefetch_distance
+.macro neon_memcpy_variant line_size, prefetch_distance, early_prefetch
 
 		cmp	r2, #3
-.if \prefetch_distance > 0
+.if \prefetch_distance > 0 || \early_prefetch == 1
 		push	{r0}
 .else
 		mov	ip, r0
 .endif
 		orr	r3, r0, r1
 		ble	8f
-.if \prefetch_distance > 0
+.if \prefetch_distance > 0 || \early_prefetch == 1
 		bic	ip, r1, #(\line_size - 1)
 .endif
 		tst	r3, #3
-.if \prefetch_distance > 0
+.if \early_prefetch == 1
 		pld	[ip]
 .endif
 		bne	10f		/* Unaligned source or destination. */
@@ -969,6 +973,9 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 blt     6f
 
 31:
+.if \early_prefetch == 1
+		pld     [ip, #\line_size]
+.endif
 .if \prefetch_distance > 0
                 /*
                  * Assume a preload at aligned base + line_size will
@@ -976,7 +983,6 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                  */
 		push	{r5}
 		mov	r4, ip
-		pld     [ip, #\line_size]
                 add     r5, r1, #(\prefetch_distance * \line_size)
                 subs    r2, r2, #(\prefetch_distance * \line_size)
                 bic     r3, r5, #(\line_size - 1)
@@ -1008,11 +1014,18 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                  * alignment for the NEON loads if the A bit is 0,
                  * but gas doesn't accept it.
                  */
-5:              vld1.32 {d0-d3}, [r1]!
+5:
+.if \line_size == 32
+		vld1.32 {d0-d3}, [r1]!
+                subs    r2, r2, #32
+                vst1.64 {d0-d3}, [r0 :256]!
+.else	/* line_size == 64 */
+		vld1.32 {d0-d3}, [r1]!
                 vld1.32 {d4-d7}, [r1]!
                 vst1.64 {d0-d3}, [r0 :256]!
                 subs    r2, r2, #64
                 vst1.64 {d4-d7}, [r0 :256]!
+.endif
                 bge     4b
 .if \prefetch_distance > 0
         	cmn     r2, #(\prefetch_distance * \line_size)
@@ -1025,21 +1038,27 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 .endif
 
                 /*
-		 * Process the last 0-63 bytes, destination 32-byte aligned,
-		 * source word aligned.
+		 * Process the last 0-(line_size - 1) bytes, destination
+		 * 32-byte aligned, source word aligned.
 		 */
 6:
 #ifdef CONFIG_THUMB
 		/*
 		 * Use conditional NEON instructions when
-		 * available (Thumb2 mode)
+		 * available (Thumb2 mode).
 		 */
+.if \line_size == 64
 		cmp     r2, #32
                 vld1ge.32 {d0-d3}, [r1]!
                 vst1ge.64 {d0-d3}, [r0 :128]!
                 tst     r2, #16
                 vld1ne.32 {d0, d1}, [r1]!
                 vst1ne.64 {d0, d1}, [r0 :128]!
+.else
+                cmp     r2, #16
+                vld1ge.32 {d0, d1}, [r1]!
+                vst1ge.64 {d0, d1}, [r0 :128]!
+.endif
                 tst     r2, #8
                 vld1ne.32 {d2}, [r1]!
                 vst1ne.64 {d2}, [r0 :64]!
@@ -1049,6 +1068,10 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 
                 pop     {r4}
 #else
+		/*
+		 * Just use the world-aligned tail code if we
+                 * don't have Thumb2.
+		 */
 		b	17f
 #endif
 
@@ -1063,7 +1086,7 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 ldrbne  r3, [r1], #1
                 strbne  r3, [r0]
 9:
-.if \prefetch_distance > 0
+.if \prefetch_distance > 0 || \early_prefetch == 1
 		pop	{r0}
 .else
 		mov	r0, ip
@@ -1095,8 +1118,11 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		/* Destination is now aligned to a word boundary. */
 11:
 		cmp	r2, #64
-		blt	16f
-		subs	r2, r2, #64
+		/*
+		 * Jump to non-aligned NEON tail code for <= 64 bytes.
+                 */
+		ble	16f
+		subs	r2, r2, #\line_size
 
                 /* Align destination to a 32-byte boundary. */
                 ands    r4, r0, #31
@@ -1128,10 +1154,13 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 32:
 #endif
                 cmp     r2, #0
-                addlt   r2, r2, #64
+                addlt   r2, r2, #\line_size
                 blt     16f
 20:
 
+.if \early_prefetch == 1
+		pld     [ip, #\line_size]
+.endif
 .if \prefetch_distance > 0
                 /*
                  * Assume a preload at aligned base + line_size will
@@ -1139,7 +1168,6 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                  */
 		push	{r5}
 		mov	r4, ip
-		pld     [ip, #\line_size]
                 add     r5, r1, #(\prefetch_distance * \line_size)
                 subs    r2, r2, #(\prefetch_distance * \line_size)
                 bic     r3, r5, #(\line_size - 1)
@@ -1168,11 +1196,18 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 .if \prefetch_distance > 0
 		pld     [r1, ip]
 .endif
-15:             vld1.8  {d0-d3}, [r1]!
+15:
+.if \line_size == 32
+		vld1.8  {d0-d3}, [r1]!
+                subs    r2, r2, #32
+                vst1.64 {d0-d3}, [r0 :256]!
+.else	/* line_size == 64 */
+		vld1.8  {d0-d3}, [r1]!
                 vld1.8  {d4-d7}, [r1]!
                 vst1.64 {d0-d3}, [r0 :256]!
                 subs    r2, r2, #64
                 vst1.64 {d4-d7}, [r0 :256]!
+.endif
                 bge     14b
 .if \prefetch_distance > 0
 		cmn     r2, #(\prefetch_distance * \line_size)
@@ -1185,20 +1220,26 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 .endif
 
 		/*
-		 * Handle last 0-63 bytes (destination 32-byte aligned,
-		 * source unaligned).
+		 * Handle last 0-(line_size - 1) bytes (destination 32-byte
+		 * aligned source unaligned).
 		 */
 #ifdef CONFIG_THUMB
 		/*
 		 * Use conditional NEON instructions when
 		 * available (Thumb2 mode)
 		 */
+.if \line_size == 64
 		cmp     r2, #32
                 vld1ge.8 {d0-d3}, [r1]!
                 vst1ge.64 {d0-d3}, [r0 :128]!
                 tst     r2, #16
                 vld1ne.8 {d0, d1}, [r1]!
                 vst1ne.64 {d0, d1}, [r0 :128]!
+.else
+                cmp     r2, #16
+                vld1ge.8 {d0, d1}, [r1]!
+                vst1ge.64 {d0, d1}, [r0 :128]!
+.endif
                 tst     r2, #8
                 vld1ne.8 {d2}, [r1]!
                 vst1ne.64 {d2}, [r0 :64]!
@@ -1326,7 +1367,7 @@ asm_function memcpy_new_line_size_32_preload_96_aligned_access
 .endfunc
 
 asm_function memcpy_new_neon
-		neon_memcpy_variant 64, 3
+		neon_memcpy_variant 64, 3, 1
 .endfunc
 
 #endif

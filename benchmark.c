@@ -78,7 +78,7 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
 #endif
     "armv5te memcpy",
     "new memcpy for sunxi with line size of 64, preload offset of 192",
-    "new memcpy for sunxi using NEON",
+    "new memcpy for cortex using NEON with line size 64, preload offset 192",
     "new memcpy for sunxi with line size of 64, preload offset of 192 and write alignment of 32",
     "new memcpy for sunxi with line size of 64, preload offset of 192 and aligned access",
     "new memcpy for sunxi with line size of 32, preload offset of 192",
