@@ -34,6 +34,9 @@
 
 #include "arm_asm.h"
 #include "new_arm.h"
+#ifdef INCLUDE_MEMCPY_HYBRID
+#include "memcpy-hybrid.h"
+#endif
 
 #define DEFAULT_TEST_DURATION 2.0
 #define RANDOM_BUFFER_SIZE 256
@@ -42,13 +45,19 @@
 
 void *armmem_memcpy(void * restrict s1, const void * restrict s2, size_t n);
 
-#define NU_MEMCPY_VARIANTS 55
-
+#define LIBARMMEM_COUNT 1
 #else
-
-#define NU_MEMCPY_VARIANTS 54
-
+#define LIBARMMEM_COUNT 0
 #endif
+
+#ifdef INCLUDE_MEMCPY_HYBRID
+#define MEMCPY_HYBRID_COUNT 1
+#else
+#define MEMCPY_HYBRID_COUNT 0
+#endif
+
+#define NU_MEMCPY_VARIANTS (55 + LIBARMMEM_COUNT + MEMCPY_HYBRID_COUNT)
+
 
 typedef void *(*memcpy_func_type)(void *dest, const void *src, size_t n);
 
@@ -64,8 +73,12 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
 #ifdef INCLUDE_LIBARMMEM_MEMCPY
     "libarmmem memcpy",
 #endif
+#ifdef INCLUDE_MEMCPY_HYBRID
+    "cortex-strings memcpy-hybrid",
+#endif
     "armv5te memcpy",
     "new memcpy for sunxi with line size of 64, preload offset of 192",
+    "new memcpy for sunxi using NEON",
     "new memcpy for sunxi with line size of 64, preload offset of 192 and write alignment of 32",
     "new memcpy for sunxi with line size of 64, preload offset of 192 and aligned access",
     "new memcpy for sunxi with line size of 32, preload offset of 192",
@@ -124,8 +137,12 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
 #ifdef INCLUDE_LIBARMMEM_MEMCPY
     armmem_memcpy,
 #endif
+#ifdef INCLUDE_MEMCPY_HYBRID
+    memcpy_hybrid,
+#endif
     memcpy_armv5te,
     memcpy_new_line_size_64_preload_192,
+    memcpy_new_neon,
     memcpy_new_line_size_64_preload_192_align_32,
     memcpy_new_line_size_64_preload_192_aligned_access,
     memcpy_new_line_size_32_preload_192,

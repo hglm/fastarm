@@ -3,17 +3,19 @@
 # Uncomment the THUMBFLAGS definition to compile in ARM mode as opposed to Thumb2
 
 PLATFORM = SUNXI
-THUMBFLAGS = -march=armv7-a -Wa,-march=armv7-a -mthumb -Wa,-mthumb \
- -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB
-BENCHMARK_CONFIG_FLAGS = # -DINCLUDE_LIBARMMEM_MEMCPY
+#THUMBFLAGS = -march=armv7-a -Wa,-march=armv7-a -mthumb -Wa,-mthumb \
+# -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB
+BENCHMARK_CONFIG_FLAGS = -DINCLUDE_MEMCPY_HYBRID # -DINCLUDE_LIBARMMEM_MEMCPY
 #LIBARMMEM = -larmmem
+CORTEX_STRINGS_MEMCPY_HYBRID = memcpy-hybrid.o
 CFLAGS = -std=gnu99 -Ofast -Wall $(BENCHMARK_CONFIG_FLAGS)
 PCFLAGS = -std=gnu99 -O -Wall $(BENCHMARK_CONFIG_FLAGS) -pg -ggdb
 
 all : benchmark libfastarm.so
 
-benchmark : benchmark.o arm_asm.o new_arm.o
-	$(CC) $(CFLAGS) benchmark.o arm_asm.o new_arm.o -o benchmark -lm -lrt $(LIBARMMEM)
+benchmark : benchmark.o arm_asm.o new_arm.o $(CORTEX_STRINGS_MEMCPY_HYBRID)
+	$(CC) $(CFLAGS) benchmark.o arm_asm.o new_arm.o \
+	$(CORTEX_STRINGS_MEMCPY_HYBRID) -o benchmark -lm -lrt $(LIBARMMEM)
 
 benchmarkp : benchmark.c arm_asm.S
 	$(CC) $(PCFLAGS) benchmark.c arm_asm.S new_arm.S -o benchmarkp -lc -lm -lrt $(LIBARMMEM)
@@ -49,6 +51,8 @@ benchmark.o : benchmark.c arm_asm.h
 arm_asm.o : arm_asm.S arm_asm.h
 
 new_arm.o : new_arm.S new_arm.h
+
+memcpy-hybrid.o : memcpy-hybrid.S
 
 .c.o : 
 	$(CC) -c $(CFLAGS) $< -o $@

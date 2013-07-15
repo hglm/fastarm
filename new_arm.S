@@ -29,6 +29,7 @@
 
 .text
 .syntax unified
+.fpu neon
 
 .macro asm_function function_name
     .global \function_name
@@ -877,6 +878,405 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 
 .endm
 
+/*
+ * The following is a NEON-based memcpy implementation that may use unaligned
+ * access, but NEON instruction addresses are always at least element aligned.
+ * It is optimized for both Thumb2 (CONFIG_THUMB) and ARM mode.
+ *
+ * - line_size is the cache line size used for prefetches. Must be 64 or 32.
+ * - prefetch_distance is the number of cache lines to look ahead and must be
+ *   >= 2, or 0 to disable prefetching altogether.
+ */
+
+.macro neon_memcpy_variant line_size, prefetch_distance
+
+		cmp	r2, #3
+.if \prefetch_distance > 0
+		push	{r0}
+.else
+		mov	ip, r0
+.endif
+		orr	r3, r0, r1
+		ble	8f
+.if \prefetch_distance > 0
+		bic	ip, r1, #(\line_size - 1)
+.endif
+		tst	r3, #3
+.if \prefetch_distance > 0
+		pld	[ip]
+.endif
+		bne	10f		/* Unaligned source or destination. */
+		push	{r4}
+
+		/* Aligned source and destination. */
+1:		cmp	r2, #64
+		/*
+		 * Jump to word-aligned NEON tail code for <= 64 bytes.
+                 */
+		ble	17f
+		subs	r2, r2, #\line_size
+
+                /* Align to a 32-byte boundary. */
+#ifdef CONFIG_THUMB
+		/*
+		 * Use conditional NEON instructions when
+		 * available (Thumb2 mode)
+		 */
+                ands    r4, r0, #31
+                rsb     r4, r4, #32
+                beq     31f
+                tst     r4, #4
+                sub     r2, r2, r4
+                ldrne   r3, [r1 :32], #4
+                strne   r3, [r0 :32], #4
+                tst     r4, #8
+		vld1ne.32 {d0}, [r1]!
+		vst1ne.32 {d0}, [r0 :64]!
+                cmp     r4, #16
+		vld1ge.32 {d2, d3}, [r1]!
+		vst1ge.32 {d2, d3}, [r0 :128]!
+#else
+		/*
+		 * Otherwise, branch into a series of single
+		 * loads/stores.
+	 	 */
+                ands    r4, r0, #31
+                beq     31f
+		rsb	r3, r4, #32
+		lsl	r4, r4, #1
+		sub	r2, r2, r3
+		add	pc, pc, r4
+		nop
+		ldr	r3, [r1], #4
+		str	r3, [r0], #4
+		ldr	r4, [r1], #4
+		str	r4, [r0], #4
+		ldr	r3, [r1], #4
+		str	r3, [r0], #4
+		ldr	r4, [r1], #4
+		str	r4, [r0], #4
+		ldr	r3, [r1], #4
+		str	r3, [r0], #4
+		ldr	r4, [r1], #4
+		str	r4, [r0], #4
+		ldr	r3, [r1], #4
+		str	r3, [r0], #4
+		ldr	r4, [r1], #4
+		str	r4, [r0], #4
+#endif
+                cmp     r2, #0
+		addlt	r2, r2, \line_size
+                blt     6f
+
+31:
+.if \prefetch_distance > 0
+                /*
+                 * Assume a preload at aligned base + line_size will
+                 * be useful.
+                 */
+		push	{r5}
+		mov	r4, ip
+		pld     [ip, #\line_size]
+                add     r5, r1, #(\prefetch_distance * \line_size)
+                subs    r2, r2, #(\prefetch_distance * \line_size)
+                bic     r3, r5, #(\line_size - 1)
+                add     r4, r4, #(2 * \line_size)
+                blt     5f
+                cmp     r4, r3
+                sub     ip, r3, r1
+                /*
+                 * "Catch-up" the early preloads (which have been performed up
+                 * to aligned source address + line_size) to the preload offset
+                 * used in the main loop.
+                 */
+                bge     3f
+2:              adds    r4, r4, #\line_size		/* Thumb16 */
+                cmp     r4, r3
+                pld     [r4, #(- \line_size)]
+                blt     2b
+3:
+.endif
+
+4:
+.if \prefetch_distance > 0
+		pld	[r1, ip]
+.endif
+                /*
+                 * Since the destination is 32-byte aligned,
+                 * specify 256-bit alignment for the NEON stores.
+                 * It should be possible to specify 32-bit
+                 * alignment for the NEON loads if the A bit is 0,
+                 * but gas doesn't accept it.
+                 */
+5:              vld1.32 {d0-d3}, [r1]!
+                vld1.32 {d4-d7}, [r1]!
+                vst1.64 {d0-d3}, [r0 :256]!
+                subs    r2, r2, #64
+                vst1.64 {d4-d7}, [r0 :256]!
+                bge     4b
+.if \prefetch_distance > 0
+        	cmn     r2, #(\prefetch_distance * \line_size)
+        	bge     5b
+.endif
+                /* Correct the count. */
+23:     	adds    r2, r2, #((\prefetch_distance + 1) * \line_size)
+.if \prefetch_distance > 0
+		pop	{r5}
+.endif
+
+                /*
+		 * Process the last 0-63 bytes, destination 32-byte aligned,
+		 * source word aligned.
+		 */
+6:
+#ifdef CONFIG_THUMB
+		/*
+		 * Use conditional NEON instructions when
+		 * available (Thumb2 mode)
+		 */
+		cmp     r2, #32
+                vld1ge.32 {d0-d3}, [r1]!
+                vst1ge.64 {d0-d3}, [r0 :128]!
+                tst     r2, #16
+                vld1ne.32 {d0, d1}, [r1]!
+                vst1ne.64 {d0, d1}, [r0 :128]!
+                tst     r2, #8
+                vld1ne.32 {d2}, [r1]!
+                vst1ne.64 {d2}, [r0 :64]!
+                tst     r2, #4
+                ldrne   r3, [r1], #4
+                strne   r3, [r0 :32], #4
+
+                pop     {r4}
+#else
+		b	17f
+#endif
+
+	        /*
+		 * Handle the last up to three bytes. Unaligned access
+		 * may take place if source or destination is not
+		 * half-word aligned.
+		 */
+8:		movs    r2, r2, lsl #31
+                ldrhcs  r3, [r1], #2
+                strhcs  r3, [r0], #2
+                ldrbne  r3, [r1], #1
+                strbne  r3, [r0]
+9:
+.if \prefetch_distance > 0
+		pop	{r0}
+.else
+		mov	r0, ip
+.endif
+		bx	lr
+
+10:             /*
+                 * Unaligned case. Align the destination.
+                 * Number of bytes is > 3.
+                 * Note: This may use unaligned access.
+                 * ip is the line_size aligned source address for preloads.
+                 */
+		cmp	r2, #64
+                push    {r4}
+		/* For small sizes < 64 bytes just use the unaligned tail code. */
+		blt	16f
+		ands	r3, r0, #3
+                beq     11f     /* Destination is aligned but source is not. */
+                /* Align the destination. */
+		cmp	r3, #2
+                ldrbne  r4, [r1], #1
+                subne   r2, r2, #1
+                strbne  r4, [r0], #1
+                ldrhle  r4, [r1], #2
+                suble   r2, r2, #2
+                strhle  r4, [r0], #2
+                tst	r1, #3
+                beq     1b      /* Destination and source are now aligned. */
+		/* Destination is now aligned to a word boundary. */
+11:
+		cmp	r2, #64
+		blt	16f
+		subs	r2, r2, #64
+
+                /* Align destination to a 32-byte boundary. */
+                ands    r4, r0, #31
+                rsb     r4, r4, #32
+                beq     20f
+                tst     r4, #4
+                sub     r2, r2, r4
+                ldrne   r3, [r1 :8], #4         /* Unaligned access. */
+                strne   r3, [r0 :32], #4
+                tst     r4, #8
+#ifdef CONFIG_THUMB
+		/*
+		 * Use conditional NEON instructions when
+		 * available (Thumb2 mode)
+		 */
+                vld1ne.8 {d0}, [r1]!
+                vst1ne.64 {d0}, [r0 :64]!
+                cmp     r4, #16
+                vld1ge.8 {d2, d3}, [r1]!
+                vst1ge.64 {d2, d3}, [r0 :128]!
+#else
+		beq	31f
+                vld1.8 {d0}, [r1]!
+                vst1.64 {d0}, [r0 :64]!
+31:             cmp     r4, #16
+		blt	32f
+                vld1.8 {d2, d3}, [r1]!
+                vst1.64 {d2, d3}, [r0 :128]!
+32:
+#endif
+                cmp     r2, #0
+                addlt   r2, r2, #64
+                blt     16f
+20:
+
+.if \prefetch_distance > 0
+                /*
+                 * Assume a preload at aligned base + line_size will
+                 * be useful.
+                 */
+		push	{r5}
+		mov	r4, ip
+		pld     [ip, #\line_size]
+                add     r5, r1, #(\prefetch_distance * \line_size)
+                subs    r2, r2, #(\prefetch_distance * \line_size)
+                bic     r3, r5, #(\line_size - 1)
+                add     r4, r4, #(2 * \line_size)
+                blt     15f
+                cmp     r4, r3
+                sub     ip, r3, r1
+                /*
+                 * "Catch-up" the early preloads (which have been performed up
+                 * to aligned source address + line_size) to the preload offset
+                 * used in the main loop.
+                 */
+                bge     13f
+12:             adds    r4, r4, #\line_size		/* Thumb16 */
+                cmp     r4, r3
+                pld     [r4, #(- \line_size)]
+                blt     12b
+.endif
+
+13:
+                /*
+                 * Process 64 unaligned bytes from source at a time and copy
+                 * them to the 32-byte aligned destination.
+                 */
+14:
+.if \prefetch_distance > 0
+		pld     [r1, ip]
+.endif
+15:             vld1.8  {d0-d3}, [r1]!
+                vld1.8  {d4-d7}, [r1]!
+                vst1.64 {d0-d3}, [r0 :256]!
+                subs    r2, r2, #64
+                vst1.64 {d4-d7}, [r0 :256]!
+                bge     14b
+.if \prefetch_distance > 0
+		cmn     r2, #(\prefetch_distance * \line_size)
+        	bge     15b
+.endif
+                /* Correct the count. */
+                adds    r2, r2, #((\prefetch_distance + 1) * \line_size)
+.if \prefetch_distance > 0
+        	pop     {r5}
+.endif
+
+		/*
+		 * Handle last 0-63 bytes (destination 32-byte aligned,
+		 * source unaligned).
+		 */
+#ifdef CONFIG_THUMB
+		/*
+		 * Use conditional NEON instructions when
+		 * available (Thumb2 mode)
+		 */
+		cmp     r2, #32
+                vld1ge.8 {d0-d3}, [r1]!
+                vst1ge.64 {d0-d3}, [r0 :128]!
+                tst     r2, #16
+                vld1ne.8 {d0, d1}, [r1]!
+                vst1ne.64 {d0, d1}, [r0 :128]!
+                tst     r2, #8
+                vld1ne.8 {d2}, [r1]!
+                vst1ne.64 {d2}, [r0 :64]!
+                tst     r2, #4
+                ldrne   r3, [r1], #4
+                strne   r3, [r0 :32], #4
+
+                pop     {r4}
+		b	8b
+#else
+		/*
+		 * Fall through to the code below. It is not entirely
+		 * optimal because it does not indicate the destination
+		 * is word aligned.
+		 */
+#endif
+
+                /* Handle small size of 0-63 bytes, unaligned. */
+16:		bic	r3, r2, #7
+		rsb	r4, r3, #64
+		tst	r2, #7
+		add	pc, pc, r4
+		nop
+		vld1.8 {d0}, [r1]!
+		vst1.8 {d0}, [r0]!
+		vld1.8 {d1}, [r1]!
+		vst1.8 {d1}, [r0]!
+		vld1.8 {d0}, [r1]!
+		vst1.8 {d0}, [r0]!
+		vld1.8 {d1}, [r1]!
+		vst1.8 {d1}, [r0]!
+		vld1.8 {d0}, [r1]!
+		vst1.8 {d0}, [r0]!
+		vld1.8 {d1}, [r1]!
+		vst1.8 {d1}, [r0]!
+		vld1.8 {d0}, [r1]!
+		vst1.8 {d0}, [r0]!
+		vld1.8 {d1}, [r1]!
+		vst1.8 {d1}, [r0]!
+                pop     {r4}
+		beq	9b
+                tst     r2, #4
+                ldrne   r3, [r1 :8], #4         /* Unaligned access. */
+                strne   r3, [r0], #4
+		b	8b
+
+                /* Handle small size of 0-64 bytes, word aligned. */
+17:		bic	r3, r2, #7
+		rsb	r4, r3, #64
+		tst	r2, #7
+		add	pc, pc, r4
+		nop
+		vld1.32 {d0}, [r1]!
+		vst1.32 {d0}, [r0]!
+		vld1.32 {d1}, [r1]!
+		vst1.32 {d1}, [r0]!
+		vld1.32 {d0}, [r1]!
+		vst1.32 {d0}, [r0]!
+		vld1.32 {d1}, [r1]!
+		vst1.32 {d1}, [r0]!
+		vld1.32 {d0}, [r1]!
+		vst1.32 {d0}, [r0]!
+		vld1.32 {d1}, [r1]!
+		vst1.32 {d1}, [r0]!
+		vld1.32 {d0}, [r1]!
+		vst1.32 {d0}, [r0]!
+		vld1.32 {d1}, [r1]!
+		vst1.32 {d1}, [r0]!
+                pop     {r4}
+		beq	9b
+		tst	r2, #4
+		ldrne	r3, [r1], #4
+		strne	r3, [r0], #4
+		b	8b
+
+.endm
+
+
 #if defined(MEMCPY_REPLACEMENT_SUNXI) || defined(MEMCPY_REPLACEMENT_RPI)
 
 #ifdef MEMCPY_REPLACEMENT_SUNXI
@@ -923,6 +1323,10 @@ asm_function memcpy_new_line_size_32_preload_96
 
 asm_function memcpy_new_line_size_32_preload_96_aligned_access
 		memcpy_variant 32, 3, 8, 1
+.endfunc
+
+asm_function memcpy_new_neon
+		neon_memcpy_variant 64, 3
 .endfunc
 
 #endif
