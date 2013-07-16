@@ -32,6 +32,16 @@
 #define ARM(instr...) instr
 #endif
 
+/*
+ * In practice, because the way NEON is configured on most systems,
+ * specifying alignment hints for NEON instructions doesn't seem
+ * to improve performance, or even degrade performance in some cases.
+ * However, actually having the address aligned to an element
+ * boundary or greater is beneficial.
+ */
+#define NEON_ALIGN(n)
+/* #define NEON_ALIGN(n) :n */
+
 /* Prevent the stack from becoming executable */
 #if defined(__linux__) && defined(__ELF__)
 .section .note.GNU-stack,"",%progbits
@@ -914,11 +924,11 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		push	{r4}
 
 		/* Aligned source and destination. */
-1:		cmp	r2, #64
+1:		cmp	r2, #256
 		/*
-		 * Jump to word-aligned NEON tail code for <= 64 bytes.
+		 * Jump to word-aligned NEON fast path <= 256 bytes.
                  */
-		ble	17f
+		ble	18f
 		subs	r2, r2, #\line_size
 
                 /* Align to a 32-byte boundary. */
@@ -936,10 +946,10 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 strne   r3, [r0 :32], #4
                 tst     r4, #8
 		vld1ne.32 {d0}, [r1]!
-		vst1ne.64 {d0}, [r0 :64]!
+		vst1ne.64 {d0}, [r0 NEON_ALIGN(64)]!
                 cmp     r4, #16
 		vld1ge.32 {d2, d3}, [r1]!
-		vst1ge.64 {d2, d3}, [r0 :128]!
+		vst1ge.64 {d2, d3}, [r0 NEON_ALIGN(128)]!
 #else
 		/*
 		 * Otherwise, branch into a series of single
@@ -1004,31 +1014,43 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 3:
 .endif
 
+		sub	ip, ip, #\line_size
 4:
-.if \prefetch_distance > 0
-		pld	[r1, ip]
-.endif
                 /*
                  * Since the destination is 32-byte aligned,
                  * specify 256-bit alignment for the NEON stores.
-                 * It should be possible to specify 32-bit
-                 * alignment for the NEON loads if the A bit is 0,
-                 * but gas doesn't accept it.
                  */
+.if \line_size == 32
+		vld1.32 {d0-d3}, [r1]!
+                subs    r2, r2, #32
+.if \prefetch_distance > 0
+		pld	[r1, ip]
+.endif
+                vst1.64 {d0-d3}, [r0 NEON_ALIGN(256)]!
+.else	/* line_size == 64 */
+		vld1.32 {d0-d3}, [r1]!
+                vld1.32 {d4-d7}, [r1]!
+.if \prefetch_distance > 0
+		pld	[r1, ip]
+.endif
+                vst1.64 {d0-d3}, [r0 NEON_ALIGN(256)]!
+                subs    r2, r2, #64
+                vst1.64 {d4-d7}, [r0 NEON_ALIGN(256)]!
+.endif
+                bge     4b
+.if \prefetch_distance > 0
 5:
 .if \line_size == 32
 		vld1.32 {d0-d3}, [r1]!
                 subs    r2, r2, #32
-                vst1.64 {d0-d3}, [r0 :256]!
+                vst1.64 {d0-d3}, [r0 NEON_ALIGN(256)]!
 .else	/* line_size == 64 */
 		vld1.32 {d0-d3}, [r1]!
                 vld1.32 {d4-d7}, [r1]!
-                vst1.64 {d0-d3}, [r0 :256]!
+                vst1.64 {d0-d3}, [r0 NEON_ALIGN(256)]!
                 subs    r2, r2, #64
-                vst1.64 {d4-d7}, [r0 :256]!
+                vst1.64 {d4-d7}, [r0 NEON_ALIGN(256)]!
 .endif
-                bge     4b
-.if \prefetch_distance > 0
         	cmn     r2, #(\prefetch_distance * \line_size)
         	bge     5b
 .endif
@@ -1051,18 +1073,18 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 .if \line_size == 64
 		cmp     r2, #32
                 vld1ge.32 {d0-d3}, [r1]!
-                vst1ge.64 {d0-d3}, [r0 :128]!
+                vst1ge.64 {d0-d3}, [r0 NEON_ALIGN(128)]!
                 tst     r2, #16
                 vld1ne.32 {d0, d1}, [r1]!
-                vst1ne.64 {d0, d1}, [r0 :128]!
+                vst1ne.64 {d0, d1}, [r0 NEON_ALIGN(128)]!
 .else
                 cmp     r2, #16
                 vld1ge.32 {d0, d1}, [r1]!
-                vst1ge.64 {d0, d1}, [r0 :128]!
+                vst1ge.64 {d0, d1}, [r0 NEON_ALIGN(128)]!
 .endif
                 tst     r2, #8
                 vld1ne.32 {d2}, [r1]!
-                vst1ne.64 {d2}, [r0 :64]!
+                vst1ne.64 {d2}, [r0 NEON_ALIGN(64)]!
                 tst     r2, #4
                 ldrne   r3, [r1], #4
                 strne   r3, [r0 :32], #4
@@ -1140,18 +1162,18 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		 * available (Thumb2 mode)
 		 */
                 vld1ne.8 {d0}, [r1]!
-                vst1ne.64 {d0}, [r0 :64]!
+                vst1ne.64 {d0}, [r0 NEON_ALIGN(64)]!
                 cmp     r4, #16
                 vld1ge.8 {d2, d3}, [r1]!
-                vst1ge.64 {d2, d3}, [r0 :128]!
+                vst1ge.64 {d2, d3}, [r0 NEON_ALIGN(128)]!
 #else
 		beq	31f
                 vld1.8 {d0}, [r1]!
-                vst1.64 {d0}, [r0 :64]!
+                vst1.64 {d0}, [r0 NEON_ALIGN(64)]!
 31:             cmp     r4, #16
 		blt	32f
                 vld1.8 {d2, d3}, [r1]!
-                vst1.64 {d2, d3}, [r0 :128]!
+                vst1.64 {d2, d3}, [r0 NEON_ALIGN(128)]!
 32:
 #endif
                 cmp     r2, #0
@@ -1201,13 +1223,13 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 .if \line_size == 32
 		vld1.8  {d0-d3}, [r1]!
                 subs    r2, r2, #32
-                vst1.64 {d0-d3}, [r0 :256]!
+                vst1.64 {d0-d3}, [r0 NEON_ALIGN(256)]!
 .else	/* line_size == 64 */
 		vld1.8  {d0-d3}, [r1]!
                 vld1.8  {d4-d7}, [r1]!
-                vst1.64 {d0-d3}, [r0 :256]!
+                vst1.64 {d0-d3}, [r0 NEON_ALIGN(256)]!
                 subs    r2, r2, #64
-                vst1.64 {d4-d7}, [r0 :256]!
+                vst1.64 {d4-d7}, [r0 NEON_ALIGN(256)]!
 .endif
                 bge     14b
 .if \prefetch_distance > 0
@@ -1232,18 +1254,18 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 .if \line_size == 64
 		cmp     r2, #32
                 vld1ge.8 {d0-d3}, [r1]!
-                vst1ge.64 {d0-d3}, [r0 :128]!
+                vst1ge.64 {d0-d3}, [r0 NEON_ALIGN(128)]!
                 tst     r2, #16
                 vld1ne.8 {d0, d1}, [r1]!
-                vst1ne.64 {d0, d1}, [r0 :128]!
+                vst1ne.64 {d0, d1}, [r0 NEON_ALIGN(128)]!
 .else
                 cmp     r2, #16
                 vld1ge.8 {d0, d1}, [r1]!
-                vst1ge.64 {d0, d1}, [r0 :128]!
+                vst1ge.64 {d0, d1}, [r0 NEON_ALIGN(128)]!
 .endif
                 tst     r2, #8
                 vld1ne.8 {d2}, [r1]!
-                vst1ne.64 {d2}, [r0 :64]!
+                vst1ne.64 {d2}, [r0 NEON_ALIGN(64)]!
                 tst     r2, #4
                 ldrne   r3, [r1], #4
                 strne   r3, [r0 :32], #4
@@ -1287,8 +1309,21 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 strne   r3, [r0], #4
 		b	8b
 
-                /* Handle small size of 0-64 bytes, word aligned. */
-17:		bic	r3, r2, #7
+                /* Handle small size of 0-63 bytes, word aligned. */
+17:
+#ifdef CONFIG_THUMB
+		cmp     r2, #32
+                vld1ge.32 {d0-d3}, [r1]!
+                vst1ge.32 {d0-d3}, [r0]!
+                tst     r2, #16
+                vld1ne.32 {d0, d1}, [r1]!
+                vst1ne.32 {d0, d1}, [r0]!
+                tst     r2, #8
+                vld1ne.32 {d2}, [r1]!
+                vst1ne.32 {d2}, [r0]!
+		tst	r2, #7
+#else
+		bic	r3, r2, #7
 		rsb	r4, r3, #64
 		tst	r2, #7
 		add	pc, pc, r4
@@ -1309,12 +1344,95 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		vst1.32 {d0}, [r0]!
 		vld1.32 {d1}, [r1]!
 		vst1.32 {d1}, [r0]!
+#endif
                 pop     {r4}
 		beq	9b
 		tst	r2, #4
 		ldrne	r3, [r1], #4
 		strne	r3, [r0], #4
 		b	8b
+
+		/*
+		 * Fast path for <= 256 bytes, word aligned.
+		 * This is hardcoded for a preload offset of 128 bytes,
+		 * which seems to work well in practice for small sizes.
+		 */
+18:		bics	r3, r2, #31
+.if \early_prefetch == 1
+		pld	[ip, #32]
+		beq	21f
+		pld	[ip, #64]
+		pld	[ip, #96]
+.endif
+		rsb	r4, r3, #256
+		ands	r2, r2, #31
+		/*
+		 * Each code block handling 32 bytes is
+                 * 12 bytes long.
+		 */
+		lsr	r4, r4, #2
+                add     ip, ip, #128
+		add	r4, r4, r4, lsr #1
+		sub	ip, ip, r1
+		add	pc, pc, r4
+		nop
+		pld	[r1, ip]
+		vld1.32 {d0-d3}, [r1]!
+		vst1.32 {d0-d3}, [r0]!
+		pld	[r1, ip]
+		vld1.32 {d4-d7}, [r1]!
+		vst1.32 {d4-d7}, [r0]!
+		pld	[r1, ip]
+		vld1.32 {d0-d3}, [r1]!
+		vst1.32 {d0-d3}, [r0]!
+		pld	[r1, ip]
+		vld1.32 {d4-d7}, [r1]!
+		vst1.32 {d4-d7}, [r0]!
+		pld	[r1, ip]
+		vld1.32 {d0-d3}, [r1]!
+		vst1.32 {d0-d3}, [r0]!
+		W(nop)
+		vld1.32 {d4-d7}, [r1]!
+		vst1.32 {d4-d7}, [r0]!
+		W(nop)
+		vld1.32 {d0-d3}, [r1]!
+		vst1.32 {d0-d3}, [r0]!
+		W(nop)
+		vld1.32 {d4-d7}, [r1]!
+		vst1.32 {d4-d7}, [r0]!
+		beq	19f
+21:
+#ifdef CONFIG_THUMB
+		cmp	r2, #16
+		vld1ge.32 {d0-d1}, [r1]!
+		vst1ge.32 {d0-d1}, [r0]!
+		tst	r2, #8
+		vld1ne.32 {d0}, [r1]!
+		vst1ne.32 {d0}, [r0]!
+#else
+		cmp	r2, #16
+		ldmiage r1!, {r3, r4}
+		stmiage r0!, {r3, r4}
+		ldmiage r1!, {r3, r4}
+		stmiage r0!, {r3, r4}
+		tst	r2, #8
+		ldmiane r1!, {r3, r4}
+		stmiane r0!, {r3, r4}
+#endif
+                tst     r2, #4
+		pop	{r4}
+                ldrne   r3, [r1], #4
+                strne   r3, [r0 :32], #4
+		and	r2, r2, #3
+		b	8b
+19:
+		pop	{r4}
+.if \prefetch_distance > 0 || \early_prefetch == 1
+		pop	{r0}
+.else
+		mov	r0, ip
+.endif
+		bx	lr
 .endm
 
 
@@ -1330,7 +1448,7 @@ asm_function memcpy
 
 #ifdef MEMCPY_REPLACEMENT_ARMV7_32
 asm_function memcpy
-		memcpy_variant 32, 4, 0, 0
+		memcpy_variant 32, 6, 0, 0
 .endfunc
 #endif
 
@@ -1342,7 +1460,7 @@ asm_function memcpy
 
 #ifdef MEMCPY_REPLACEMENT_NEON_32
 asm_function memcpy
-		neon_memcpy_variant 32, 4, 1
+		neon_memcpy_variant 32, 6, 1
 .endfunc
 #endif
 
@@ -1354,7 +1472,7 @@ asm_function memcpy
 
 #ifdef MEMCPY_REPLACEMENT_NEON_AUTO
 asm_function memcpy
-		neon_memcpy_variant 64, 0, 1
+		neon_memcpy_variant 32, 0, 1
 .endfunc
 #endif
 
@@ -1388,8 +1506,12 @@ asm_function memcpy_new_line_size_32_preload_96_aligned_access
 		memcpy_variant 32, 3, 8, 1
 .endfunc
 
-asm_function memcpy_new_neon
+asm_function memcpy_new_neon_line_size_64
 		neon_memcpy_variant 64, 3, 1
+.endfunc
+
+asm_function memcpy_new_neon_line_size_32
+		neon_memcpy_variant 32, 6, 1
 .endfunc
 
 #endif
@@ -1453,18 +1575,18 @@ asm_function memcpy_new_neon
 .if \use_neon == 1
 #ifdef CONFIG_THUMB
 	tst     r4, #8
-	vst1ne.64 {d0}, [r0 :64]!
+	vst1ne.64 {d0}, [r0 NEON_ALIGN(64)]!
 	cmp	r4, #16
-	vst1ge.64 {d0, d1}, [r0 :128]!
+	vst1ge.64 {d0, d1}, [r0 NEON_ALIGN(128)]!
 #else
 	bic	r4, r3, #7
 	lsr	r4, r4, #1
 	add	pc, pc, r4
 	nop
-	vst1.64 {d0}, [r0 :64]!
-	vst1.64 {d0}, [r0 :64]!
-	vst1.64 {d0}, [r0 :64]!
-	vst1.64 {d0}, [r0 :64]!
+	vst1.64 {d0}, [r0 NEON_ALIGN(64)]!
+	vst1.64 {d0}, [r0 NEON_ALIGN(64)]!
+	vst1.64 {d0}, [r0 NEON_ALIGN(64)]!
+	vst1.64 {d0}, [r0 NEON_ALIGN(64)]!
 #endif
 .else
 	tst     r4, #8
@@ -1487,9 +1609,9 @@ asm_function memcpy_new_neon
          */
 	subs	r2, r2, #64
         vmov	q1, q0
-3:	vst1.64 {d0-d3}, [r0 :256]!
+3:	vst1.64 {d0-d3}, [r0 NEON_ALIGN(256)]!
 	subs	r2, r2, #64
-        vst1.64 {d0-d3}, [r0 :256]!
+        vst1.64 {d0-d3}, [r0 NEON_ALIGN(256)]!
         bge     3b
 	adds	r2, r2, #64
 .else
@@ -1523,11 +1645,11 @@ ARM(	beq	9f	)
 #ifdef CONFIG_THUMB
 	vmov	q1, q0
 	cmp	r2, #32
-	vst1ge.64 {d0-d3}, [r0 :64]!
+	vst1ge.64 {d0-d3}, [r0 NEON_ALIGN(64)]!
 	tst	r2, #16
-	vst1ne.64 {d0, d1}, [r0 :64]!
+	vst1ne.64 {d0, d1}, [r0 NEON_ALIGN(64)]!
 	tst	r2, #8
-	vst1ne.64 {d0}, [r0 :64]!
+	vst1ne.64 {d0}, [r0 NEON_ALIGN(64)]!
 	and	r2, r2, #7
 #else
 	bic	r4, r2, #15
@@ -1540,10 +1662,10 @@ ARM(	beq	9f	)
 	lsr	r4, r4, #2
 	add	pc, pc, r4
 	nop
-	vst1.64 {d0, d1}, [r0 :64]!
-	vst1.64 {d0, d1}, [r0 :64]!
-	vst1.64 {d0, d1}, [r0 :64]!
-	vst1.64 {d0, d1}, [r0 :64]!
+	vst1.64 {d0, d1}, [r0 NEON_ALIGN(64)]!
+	vst1.64 {d0, d1}, [r0 NEON_ALIGN(64)]!
+	vst1.64 {d0, d1}, [r0 NEON_ALIGN(64)]!
+	vst1.64 {d0, d1}, [r0 NEON_ALIGN(64)]!
 	cmp	r2, #8
 	strge	r1, [r0], #4
 	strge	r1, [r0], #4

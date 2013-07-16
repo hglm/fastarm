@@ -56,7 +56,7 @@ void *armmem_memcpy(void * restrict s1, const void * restrict s2, size_t n);
 #define MEMCPY_HYBRID_COUNT 0
 #endif
 
-#define NU_MEMCPY_VARIANTS (55 + LIBARMMEM_COUNT + MEMCPY_HYBRID_COUNT)
+#define NU_MEMCPY_VARIANTS (56 + LIBARMMEM_COUNT + MEMCPY_HYBRID_COUNT)
 #define NU_MEMSET_VARIANTS 5
 
 
@@ -82,11 +82,12 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "cortex-strings memcpy-hybrid",
 #endif
     "armv5te memcpy",
-    "new memcpy for sunxi with line size of 64, preload offset of 192",
+    "new memcpy for cortex with line size of 32, preload offset of 192",
+    "new memcpy for cortex with line size of 64, preload offset of 192",
+    "new memcpy for cortex using NEON with line size 32, preload offset 192",
     "new memcpy for cortex using NEON with line size 64, preload offset 192",
     "new memcpy for sunxi with line size of 64, preload offset of 192 and write alignment of 32",
     "new memcpy for sunxi with line size of 64, preload offset of 192 and aligned access",
-    "new memcpy for sunxi with line size of 32, preload offset of 192",
     "new memcpy for sunxi with line size of 32, preload offset of 192 and write alignment of 32",
     "new memcpy for rpi with preload offset of 96, write alignment of 8",
     "new memcpy for rpi with preload offset of 96, write alignment of 8 and aligned access",
@@ -146,11 +147,12 @@ static const memcpy_func_type memcpy_variant[NU_MEMCPY_VARIANTS] = {
     memcpy_hybrid,
 #endif
     memcpy_armv5te,
+    memcpy_new_line_size_32_preload_192,
     memcpy_new_line_size_64_preload_192,
-    memcpy_new_neon,
+    memcpy_new_neon_line_size_32,
+    memcpy_new_neon_line_size_64,
     memcpy_new_line_size_64_preload_192_align_32,
     memcpy_new_line_size_64_preload_192_aligned_access,
-    memcpy_new_line_size_32_preload_192,
     memcpy_new_line_size_32_preload_192_align_32,
     memcpy_new_line_size_32_preload_96,
     memcpy_new_line_size_32_preload_96_aligned_access,

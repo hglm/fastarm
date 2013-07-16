@@ -19,7 +19,7 @@ plethora of variants with different preload strategies, block sizes,
 alignment etc.
 
 A benchmark program to compare various memcpy variants is provided. Try
-something like "./benchmark --memcpy ad --all". (Use --memcpy aj on the
+something like "./benchmark --memcpy ad --all". (Use --memcpy ak on the
 Raspberry Pi platform).
 
 To compile a memcpy replacement library, set PLATFORM to one of the
@@ -53,3 +53,11 @@ edit /etc/ld.so.preload so that it contains the line:
     /usr/lib/arm-linux-gnueabihf/libcofi_rpi.so
 
 instead of the one using libfastarm.so.
+
+Note on cache line size:
+
+Although assuming a preload line size 64 bytes is a little faster on several
+Cortex platforms for small to moderate sizes. However, when accessing DRAM
+with larger sizes assuming 32 byte preloads seems to be faster. On earlier
+Cortex A9 models, 32 byte preloads are required for good performance in all
+cases.
