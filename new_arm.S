@@ -22,22 +22,6 @@
  *
  */
 
-/* Prevent the stack from becoming executable */
-#if defined(__linux__) && defined(__ELF__)
-.section .note.GNU-stack,"",%progbits
-#endif
-
-.text
-.syntax unified
-.fpu neon
-
-.macro asm_function function_name
-    .global \function_name
-.func \function_name
-.type \function_name, function
-\function_name:
-.endm
-
 #ifdef CONFIG_THUMB
 #define W(instr) instr.w
 #define THUMB(instr...)	instr
@@ -47,6 +31,23 @@
 #define THUMB(instr...)
 #define ARM(instr...) instr
 #endif
+
+/* Prevent the stack from becoming executable */
+#if defined(__linux__) && defined(__ELF__)
+.section .note.GNU-stack,"",%progbits
+#endif
+
+.text
+.syntax unified
+
+.macro asm_function function_name
+    .global \function_name
+.func \function_name
+.type \function_name, function
+ARM(    .p2align 5      )
+THUMB(  .p2align 2      )
+\function_name:
+.endm
 
 /*
  * The following memcpy implementation is optimized with a fast path
@@ -935,10 +936,10 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
                 strne   r3, [r0 :32], #4
                 tst     r4, #8
 		vld1ne.32 {d0}, [r1]!
-		vst1ne.32 {d0}, [r0 :64]!
+		vst1ne.64 {d0}, [r0 :64]!
                 cmp     r4, #16
 		vld1ge.32 {d2, d3}, [r1]!
-		vst1ge.32 {d2, d3}, [r0 :128]!
+		vst1ge.64 {d2, d3}, [r0 :128]!
 #else
 		/*
 		 * Otherwise, branch into a series of single
@@ -1314,26 +1315,47 @@ THUMB(		lsrs    r4, r4, #1	)	/* Thumb16 */
 		ldrne	r3, [r1], #4
 		strne	r3, [r0], #4
 		b	8b
-
 .endm
 
 
-#if defined(MEMCPY_REPLACEMENT_SUNXI) || defined(MEMCPY_REPLACEMENT_RPI)
-
-#ifdef MEMCPY_REPLACEMENT_SUNXI
-
-asm_function memcpy
-		memcpy_variant 64, 3, 0, 0
-.endfunc
-
-#endif
+#if defined(MEMCPY_REPLACEMENT_RPI) || defined(MEMCPY_REPLACEMENT_ARMV7_32) \
+|| defined(MEMCPY_REPLACEMENT_ARMV7_64) || defined(MEMCPY_REPLACEMENT_NEON_32) \
+|| defined(MEMCPY_REPLACEMENT_NEON_64)
 
 #ifdef MEMCPY_REPLACEMENT_RPI
-
 asm_function memcpy
 		memcpy_variant 32, 3, 8, 0
 .endfunc
+#endif
 
+#ifdef MEMCPY_REPLACEMENT_ARMV7_32
+asm_function memcpy
+		memcpy_variant 32, 4, 0, 0
+.endfunc
+#endif
+
+#ifdef MEMCPY_REPLACEMENT_ARMV7_64
+asm_function memcpy
+		memcpy_variant 64, 3, 0, 0
+.endfunc
+#endif
+
+#ifdef MEMCPY_REPLACEMENT_NEON_32
+asm_function memcpy
+		neon_memcpy_variant 32, 4, 1
+.endfunc
+#endif
+
+#ifdef MEMCPY_REPLACEMENT_NEON_64
+asm_function memcpy
+		neon_memcpy_variant 64, 3, 1
+.endfunc
+#endif
+
+#ifdef MEMCPY_REPLACEMENT_NEON_AUTO
+asm_function memcpy
+		neon_memcpy_variant 64, 0, 1
+.endfunc
 #endif
 
 #else
@@ -1373,157 +1395,250 @@ asm_function memcpy_new_neon
 #endif
 
 /*
- *  Macro for memset replacement.
- *  write_align must be 0, 8, or 32.
+ * Macro for memset replacement.
+ * write_align must be 0, 8, or 32.
+ * use_neon must be 0 or 1.
  */
 
-.macro memset_variant write_align
-		ands	r3, r0, #3
-		mov	ip, r0
-		bne	8f
+.macro memset_variant write_align, use_neon
+.if \use_neon == 1
+	.fpu neon
+.endif
+	ands	r3, r0, #3
+	mov	ip, r0
+	bne	7f
 
-		/* r0 is now aligned to a word boundary. */
-1:		orr	r1, r1, r1, lsl #8
-		cmp	r2, #8
-		orr	r1, r1, r1, lsl #16
-		blt	5f
-		mov	r3, r1
+	/* Destination is word aligned. */
+1:	orr	r1, r1, r1, lsl #8
+	cmp	r2, #8
+	orr	r1, r1, r1, lsl #16
+	blt	5f
+.if \use_neon == 1
+        vmov	d0, r1, r1
+	vmov	d1, r1, r1
+.else
+	mov	r3, r1
+.endif
 
-		cmp	r2, #64
-		push 	{r4}
-		blt	4f
-		mov	r4, r1
-
+	cmp	r2, #64
+	push 	{r4}
+	blt	4f
 .if \write_align > 0
+	ands	r4, r0, #(\write_align - 1)
+.if \use_neon == 1
+#ifndef CONFIG_THUMB
+	add	r3, r4, #7
+#endif
+.endif
+	/* Let r4 be equal to the number of bytes to align.  */
+	rsb	r4, r4, #\write_align
+	/*
+	 * At this point r4 contains the number of bytes to align
+	 * if eq is not set. The eq flag is set if there are no bytes
+	 * to align.
+	 */
 .if \write_align == 8
-		tst	r0, #4
-		beq	2f
-
-		cmp	r2, #68
-		str	r1, [r0], #4
-	        sub	r2, r2, #4
-		blt     4f
-.else	/* write_align == 32 */
-		tst	r0, #31
-		beq	2f
-		tst     r0, #4
-		strne	r1, [r0], #4
-	        subne	r2, r2, #4
-		tst     r0, #8
-		stmiane r0!, {r1, r3}
-	        subne   r2, r2, #8
-		tst	r0, #16
-		stmiane r0!, {r1, r3}
-	        subne   r2, r2, #16
-	        stmiane r0!, {r1, r3}
-		cmp	r2, #64
-		blt	4f
+	subne	r2, r2, r4
+	strne	r1, [r0], #4
+.elseif \write_align == 32
+	beq	2f
+	tst     r4, #4
+	sub	r2, r2, r4
+	strne	r1, [r0], #4
+.if \use_neon == 1
+#ifdef CONFIG_THUMB
+	tst     r4, #8
+	vst1ne.64 {d0}, [r0 :64]!
+	cmp	r4, #16
+	vst1ge.64 {d0, d1}, [r0 :128]!
+#else
+	bic	r4, r3, #7
+	lsr	r4, r4, #1
+	add	pc, pc, r4
+	nop
+	vst1.64 {d0}, [r0 :64]!
+	vst1.64 {d0}, [r0 :64]!
+	vst1.64 {d0}, [r0 :64]!
+	vst1.64 {d0}, [r0 :64]!
+#endif
+.else
+	tst     r4, #8
+	stmiane r0!, {r1, r3}
+	cmp	r4, #16
+	stmiage r0!, {r1, r3}
+	stmiage r0!, {r1, r3}
 .endif
+.endif	/* \write_align == 32 */
+	cmp	r2, #64
+	blt	4f
+.endif	/* \write_align > 0 */
+
+2:
+.if \use_neon == 1
+        /*
+         * When NEON is enabled, \write_align is
+         * equal to 32 so specify 256-bit alignment in the
+         * NEON store instructions.
+         */
+	subs	r2, r2, #64
+        vmov	q1, q0
+3:	vst1.64 {d0-d3}, [r0 :256]!
+	subs	r2, r2, #64
+        vst1.64 {d0-d3}, [r0 :256]!
+        bge     3b
+	adds	r2, r2, #64
+.else
+	mov	r4, r1
+	subs	r2, r2, #64
+	push	{r5}
+	mov	r5, r1
+
+3:	stmia	r0!, {r1, r3, r4, r5}
+	subs	r2, r2, #64		/* Thumb16 */
+	stmia	r0!, {r1, r3, r4, r5}
+	stmia	r0!, {r1, r3, r4, r5}
+	stmia	r0!, {r1, r3, r4, r5}
+	bge	3b
+	adds	r2, r2, #64		/* Thumb16 */
+
+	pop	{r5}
 .endif
+	/* Early exit if there are 0 bytes left. */
+/* THUMB(	cbz	r2, 9f	) */
+THUMB(	cmp	r2, #0	)
+THUMB(	beq	9f	)
+ARM(	teq	r2, #0	)
+ARM(	beq	9f	)
+	/* Handle 8-64 bytes. */
+4:
+.if \use_neon == 1
+	bic	r4, r2, #15
+.else
+	bic	r4, r2, #7
+.endif
+	subs	r2, r2, r4
+	rsb	r4, r4, #64
+	/*
+	 * The stmia instruction (storing 8 bytes) is 32-bit for ARM,
+	 * 16-bit for Thumb2. When using NEON, the vst instruction
+	 * (storing 16 bytes) is always 32-bit.
+	 */
+.if \use_neon == 1
+THUMB(	lsrs	r4, r4, #2	)
+ARM(	lsr	r4, r4, #2	)
+.else
+THUMB(	lsrs	r4, r4, #2	)
+ARM(	lsr	r4, r4, #1	)
+.endif
+	add	pc, pc, r4
+	nop
+.if \use_neon == 1
+	vst1.32 {d0, d1}, [r0]!
+	vst1.32 {d0, d1}, [r0]!
+	vst1.32 {d0, d1}, [r0]!
+	vst1.32 {d0, d1}, [r0]!
+	cmp	r2, #8
+#if CONFIG_THUMB
+	vst1ge.32 {d0}, [r0]!
+#else
+	strge	r1, [r0], #4
+	strge	r1, [r0], #4
+#endif
+	subge	r2, r2, #8
+.else
+	stmia	r0!, {r1, r3}
+	stmia	r0!, {r1, r3}
+	stmia	r0!, {r1, r3}
+	stmia	r0!, {r1, r3}
+	stmia	r0!, {r1, r3}
+	stmia	r0!, {r1, r3}
+	stmia	r0!, {r1, r3}
+	stmia	r0!, {r1, r3}
+.endif
+	pop	{r4}
 
-2:		push	{r5}
-		mov	r5, r1
+5:	cmp	r2, #4
+	strge	r1, [r0], #4
+	/* Early exit for multiple of 4 size. */
+	ands	r2, r2, #3
+	moveq	r0, ip
+	bxeq	lr
 
-3:		stmia	r0!, {r1, r3, r4, r5}
-		subs	r2, r2, #64
-		stmia	r0!, {r1, r3, r4, r5}
-		cmp	r2, #64
-		stmia	r0!, {r1, r3, r4, r5}
-		stmia	r0!, {r1, r3, r4, r5}
-		bge	3b
+	/*
+	 * At this point there are 1, 2 or 3 bytes,
+	 * and the destination is aligned.
+	 */
+6:	cmp	r2, #2
+	strhge	r1, [r0], #2
+	strbne	r1, [r0]
+	mov	r0, ip
+	bx	lr
 
-		pop	{r5}
-		/* Early exit if there are 0 bytes left. */
-	THUMB(	cbz	r2, 7f	)
-	ARM(	teq	r2, #0	)
-	ARM(	beq	7f	)
+	/* Unaligned case; align the destination. */
+7:	cmp	r2, #4
+	blt	8f
+	cmp	r3, #2
+	sub	r2, r2, #4
+	strble	r1, [r0]
+	strble	r1, [r0, #1]
+	addle	r0, r0, #2
+	add	r2, r2, r3
+	strbne	r1, [r0], #1
+	b	1b
 
-		/* Handle 8-64 bytes. */
-4:		bic	r4, r2, #7
-		subs	r2, r2, r4
-		rsb	r4, r4, #64
-		/* The stmia instruction is 32-bit for ARM, 16-bit for Thumb2. */
-	THUMB(	lsrs	r4, r4, #2	)
-	ARM(	lsrs	r4, r4, #1	)
-		add	pc, pc, r4
-		nop
-		stmia	r0!, {r1, r3}
-		stmia	r0!, {r1, r3}
-		stmia	r0!, {r1, r3}
-		stmia	r0!, {r1, r3}
-		stmia	r0!, {r1, r3}
-		stmia	r0!, {r1, r3}
-		stmia	r0!, {r1, r3}
-		stmia	r0!, {r1, r3}
-		pop	{r4}
+	/* 0 to 3 bytes left. */
+8:	cmp	r2, #2
+	strbge  r1, [r0]
+	strbge  r1, [r0, #1]
+	addge	r0, r0, #2
+	tst	r2, #1
+	strbne  r1, [r0]
+	mov	r0, ip
+	bx	lr
 
-5:		cmp	r2, #4
-		strge	r1, [r0], #4
-		/* Early exit for multiple of 4 size. */
-		ands	r2, r2, #3
-		moveq	r0, ip
-		bxeq	lr
-
-		/*
-		 * At this point there are 1, 2 or 3 bytes,
-		 * and the destination may be unaligned.
-		 */
-6:		cmp	r2, #2
-		strbge	r1, [r0], #1
-		strbge	r1, [r0], #1
-		strbne	r1, [r0], #1
-		mov	r0, ip
-		bx	lr
-
-7:		pop	{r4}
-		mov	r0, ip
-		bx	lr
-
-8:		cmp	r2, #4
-		blt	9f
-		cmp	r3, #2
-		strblt	r1, [r0], #1
-		strble	r1, [r0], #1
-		subs	r2, r2, #4
-		strb	r1, [r0], #1
-		add	r2, r2, r3
-		b	1b
-
-9:		cmp	r2, #0
-		bne	6b
-		bx	lr
+9:	pop	{r4}
+	mov	r0, ip
+	bx	lr
 .endm
 
-#if defined(MEMSET_REPLACEMENT_SUNXI) || defined(MEMSET_REPLACEMENT_RPI)
-
-#ifdef MEMSET_REPLACEMENT_SUNXI
-
-asm_function memset
-		memset_variant 0
-.endfunc
-
-#endif
+#if defined(MEMSET_REPLACEMENT_RPI) || defined(MEMSET_REPLACEMENT_ARMV7_32) \
+|| defined(MEMSET_REPLACEMENT_ARMV7_64) || defined(MEMSET_REPLACEMENT_NEON_32) \
+|| defined(MEMSET_REPLACEMENT_NEON_64)
 
 #ifdef MEMSET_REPLACEMENT_RPI
-
 asm_function memset
-		memset_variant 32
+		memset_variant 32, 0
 .endfunc
+#endif
 
+#if defined(MEMSET_REPLACEMENT_ARMV7_32) || defined(MEMSET_REPLACEMENT_ARMV7_64)
+asm_function memset
+		memset_variant 8, 0
+.endfunc
+#endif
+
+#if defined(MEMSET_REPLACEMENT_NEON_32) || defined(MEMSET_REPLACEMENT_NEON_64)
+asm_function memset
+		memset_variant 32, 1
+.endfunc
 #endif
 
 #else
 
 asm_function memset_new_align_0
-		memset_variant 0
+		memset_variant 0, 0
 .endfunc
 
 asm_function memset_new_align_8
-		memset_variant 8
+		memset_variant 8, 0
 .endfunc
 
 asm_function memset_new_align_32
-		memset_variant 32
+		memset_variant 32, 0
+.endfunc
+
+asm_function memset_neon
+		memset_variant 32, 1
 .endfunc
 
 #endif

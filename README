@@ -1,31 +1,30 @@
 fastarm
 
-This toolkit contains a set of fast memcpy variants for ARM platforms.
-They uses the standard register file, VFP or NEON registers are not
-used.
+This toolkit contains a set of fast memcpy/memset variants for ARM
+platforms. They either use the standard register file, or optionally
+NEON instructions,
 
-Several basic families of variants are provided; the latest ones are
+Several basic families of variants are provided; the current ones are
 the "new memcpy" variants which are the default for memcpy replacement,
 which generally do not overfetch beyond the source region and can be
 configured to use unaligned memory access for small sizes, or to use
 strictly aligned memory access. This family can also be configured to
 include a fast path for smaller sizes (this is the default), disabling
 this results in smaller code size at the expense of worse performance
-for small sizes.
+for small sizes. NEON opimized versions, which are generally faster
+with reduced code size, are also provided.
 
 To compile the benchmark program, run 'make'. This will compile in a
 plethora of variants with different preload strategies, block sizes,
 alignment etc.
 
 A benchmark program to compare various memcpy variants is provided. Try
-something like "./benchmark --memcpy ac --all". (Use --memcpy ah on the
+something like "./benchmark --memcpy ad --all". (Use --memcpy aj on the
 Raspberry Pi platform).
 
 To compile a memcpy replacement library, set PLATFORM to one of the
-following values in the Makefile:
-
-    SUNXI    Allwinner platform (tested on A10).
-    RPI      Raspberry Pi
+values described at the beginning of the Makefile. This selects the
+cache line size to use and whether to use NEON versions.
 
 Optionally disable Thumb2 mode compilation by commenting out the THUMBFLAGS
 definition. It must be disabled on the Raspberry Pi.
@@ -34,10 +33,8 @@ Then run:
 
     sudo make install_memcpy_replacement
 
-The replacement memcpy shared library will be installed into
-/usr/lib/arm-linux-gnueabihf/ as libfastarm.so. The variant used is currently
-from the new family with line size, write alignment and preload offset
-optimized for the platform. A memset replacement is also provided.
+The replacement memcpy/memset shared library will be installed into
+/usr/lib/arm-linux-gnueabihf/ as libfastarm.so.
 
 To enable the use of the replacement memcpy in applications, create or edit
 the file /etc/ld.so.preload so that it contains the line:

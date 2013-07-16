@@ -27,3 +27,5 @@ extern void *memset_new_align_0(void *dest, int c, size_t size);
 extern void *memset_new_align_8(void *dest, int c, size_t size);
 
 extern void *memset_new_align_32(void *dest, int c, size_t size);
+
+extern void *memset_neon(void *dest, int c, size_t size);

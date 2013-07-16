@@ -1,8 +1,21 @@
-# PLATFORM must be SUNXI or RPI and is used to select the memcpy
-# variant used in the memcpy replacement library (libfastarm.so)
+# PLATFORM must one of the following list and is used to select the memcpy/
+# memset variants used in the replacement library (libfastarm.so)
+# - RPI selects optimizations for the armv6-based Raspberry Pi with a
+#   preload offset of 96 bytes.
+# - ARMV7_32 selects a cache line size, suitable for early Cortex A9-based
+#   platforms. The used preload offset is 128 bytes.
+# - ARMV7_64 selects a cache line size of 64 bytes, suitable for most other
+#   Cortex platforms. The used preload offset is 192 bytes.
+# - NEON_32 selects NEON optimizations with a cache line of 32 bytes, suitable
+#   for early Cortex A9-based platforms. The used preload offset is 128 bytes.
+# - NEON_64 selects NEON optimizations for most other Cortex cores with a cache
+#   line size of 64 bytes. The used preload offset is 192 bytes.
+# - NEON_AUTO selects NEON optimizations for Cortex cores with a suitably
+#   advanced automatic prefetcher that most preload instructions are unnecessary.
+#   Only early preloads are generated.
 # Uncomment the THUMBFLAGS definition to compile in ARM mode as opposed to Thumb2
 
-PLATFORM = SUNXI
+PLATFORM = NEON_64
 #THUMBFLAGS = -march=armv7-a -Wa,-march=armv7-a -mthumb -Wa,-mthumb \
 # -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB
 BENCHMARK_CONFIG_FLAGS = -DINCLUDE_MEMCPY_HYBRID # -DINCLUDE_LIBARMMEM_MEMCPY
