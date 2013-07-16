@@ -1410,19 +1410,24 @@ asm_function memcpy_new_neon
 
 	/* Destination is word aligned. */
 1:	orr	r1, r1, r1, lsl #8
-	cmp	r2, #8
-	orr	r1, r1, r1, lsl #16
-	blt	5f
 .if \use_neon == 1
+	cmp	r2, #16
+.else
+	cmp	r2, #8
+.endif
+	orr	r1, r1, r1, lsl #16
+.if \use_neon == 1
+	blt	13f
         vmov	d0, r1, r1
 	vmov	d1, r1, r1
 .else
+	blt	5f
 	mov	r3, r1
 .endif
 
 	cmp	r2, #64
 	push 	{r4}
-	blt	4f
+	ble	10f
 .if \write_align > 0
 	ands	r4, r0, #(\write_align - 1)
 .if \use_neon == 1
@@ -1509,43 +1514,53 @@ THUMB(	cmp	r2, #0	)
 THUMB(	beq	9f	)
 ARM(	teq	r2, #0	)
 ARM(	beq	9f	)
-	/* Handle 8-64 bytes. */
+	/*
+	 * Handle 8-64 bytes (or 16-64 bytes in case of NEON).
+	 * In case of NEON, destination must be 8-byte aligned.
+	 */
 4:
 .if \use_neon == 1
+#ifdef CONFIG_THUMB
+	vmov	q1, q0
+	cmp	r2, #32
+	vst1ge.64 {d0-d3}, [r0 :64]!
+	tst	r2, #16
+	vst1ne.64 {d0, d1}, [r0 :64]!
+	tst	r2, #8
+	vst1ne.64 {d0}, [r0 :64]!
+	and	r2, r2, #7
+#else
 	bic	r4, r2, #15
-.else
+	subs	r2, r2, r4
+	rsb	r4, r4, #64
+	/*
+	 * When using NEON, the vst instruction
+	 * (storing 16 bytes) is always 32-bit.
+	 */
+	lsr	r4, r4, #2
+	add	pc, pc, r4
+	nop
+	vst1.64 {d0, d1}, [r0 :64]!
+	vst1.64 {d0, d1}, [r0 :64]!
+	vst1.64 {d0, d1}, [r0 :64]!
+	vst1.64 {d0, d1}, [r0 :64]!
+	cmp	r2, #8
+	strge	r1, [r0], #4
+	strge	r1, [r0], #4
+	subge	r2, r2, #8
+#endif
+.else	/* use_neon == 0 */
 	bic	r4, r2, #7
-.endif
 	subs	r2, r2, r4
 	rsb	r4, r4, #64
 	/*
 	 * The stmia instruction (storing 8 bytes) is 32-bit for ARM,
-	 * 16-bit for Thumb2. When using NEON, the vst instruction
-	 * (storing 16 bytes) is always 32-bit.
+	 * 16-bit for Thumb2.
 	 */
-.if \use_neon == 1
-THUMB(	lsrs	r4, r4, #2	)
-ARM(	lsr	r4, r4, #2	)
-.else
 THUMB(	lsrs	r4, r4, #2	)
 ARM(	lsr	r4, r4, #1	)
-.endif
 	add	pc, pc, r4
 	nop
-.if \use_neon == 1
-	vst1.32 {d0, d1}, [r0]!
-	vst1.32 {d0, d1}, [r0]!
-	vst1.32 {d0, d1}, [r0]!
-	vst1.32 {d0, d1}, [r0]!
-	cmp	r2, #8
-#if CONFIG_THUMB
-	vst1ge.32 {d0}, [r0]!
-#else
-	strge	r1, [r0], #4
-	strge	r1, [r0], #4
-#endif
-	subge	r2, r2, #8
-.else
 	stmia	r0!, {r1, r3}
 	stmia	r0!, {r1, r3}
 	stmia	r0!, {r1, r3}
@@ -1555,7 +1570,7 @@ ARM(	lsr	r4, r4, #1	)
 	stmia	r0!, {r1, r3}
 	stmia	r0!, {r1, r3}
 .endif
-	pop	{r4}
+14:	pop	{r4}
 
 5:	cmp	r2, #4
 	strge	r1, [r0], #4
@@ -1574,9 +1589,30 @@ ARM(	lsr	r4, r4, #1	)
 	mov	r0, ip
 	bx	lr
 
-	/* Unaligned case; align the destination. */
+.if \use_neon == 1
+	/* 0-15 bytes left, word aligned. */
+13:	cmp	r2, #8
+	strge	r1, [r0]
+	strge	r1, [r0, #4]
+	addge	r0, r0, #8
+	subge	r2, r2, #8
+	b	5b
+.endif
+
+	/* Unaligned case. */
 7:	cmp	r2, #4
 	blt	8f
+#ifdef CONFIG_THUMB
+.if \use_neon == 1
+	/*
+	 * When Thumb2 is enabled with NEON, use the optimized
+	 * unaligned NEON code path for small sizes.
+	 */
+	cmp 	r2, #64
+	blt	11f
+.endif
+#endif
+	/* Align the destination. */
 	cmp	r3, #2
 	sub	r2, r2, #4
 	strble	r1, [r0]
@@ -1599,6 +1635,52 @@ ARM(	lsr	r4, r4, #1	)
 9:	pop	{r4}
 	mov	r0, ip
 	bx	lr
+
+	/*
+	 * Word aligned 8 <= size <= 64
+	 * (16 <= size <= 64 in case of NEON).
+	 */
+10:
+	/* Align the destination to an 8 byte boundary. */
+	tst     r0, #4
+	strne	r1, [r0], #4
+	subne	r2, r2, #4
+.if \use_neon == 1
+	cmp	r2, #16
+	poplt	{r4}
+	blt	13b
+.else
+	cmp	r2, #8
+	blt	14b
+.endif
+	b	4b
+
+#ifdef CONFIG_THUMB
+.if \use_neon == 1
+	/*
+	 * Handle 4 <= size <= 63 bytes, unaligned.
+	 * Use unaligned NEON instructions with Thumb2.
+	 */
+11:
+	orr	r1, r1, r1, lsl #8
+	tst	r2, #8
+	orr	r1, r1, r1, lsl #16
+        vmov	d0, r1, r1
+	vst1ne.8 {d0}, [r0]!
+	vmov	d1, r1, r1
+	tst	r2, #16
+	vst1ne.8 {d0, d1}, [r0]!
+	vmov	q1, q0
+	cmp	r2, #32
+	and	r2, r2, #7
+	vst1ge.8 {d0-d3}, [r0]!
+	cmp	r2, #4
+	/* The following store is unaligned. */
+	strge	r1, [r0], #4
+	subge	r2, r2, #4
+	b	8b
+.endif
+#endif
 .endm
 
 #if defined(MEMSET_REPLACEMENT_RPI) || defined(MEMSET_REPLACEMENT_ARMV7_32) \
