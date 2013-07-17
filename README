@@ -11,7 +11,7 @@ configured to use unaligned memory access for small sizes, or to use
 strictly aligned memory access. This family can also be configured to
 include a fast path for smaller sizes (this is the default), disabling
 this results in smaller code size at the expense of worse performance
-for small sizes. NEON opimized versions, which are generally faster
+for small sizes. NEON optimized versions, which are generally faster
 with reduced code size, are also provided.
 
 To compile the benchmark program, run 'make'. This will compile in a
@@ -61,3 +61,37 @@ Cortex platforms for small to moderate sizes. However, when accessing DRAM
 with larger sizes assuming 32 byte preloads seems to be faster. On earlier
 Cortex A9 models, 32 byte preloads are required for good performance in all
 cases.
+
+Notes on performance with and without NEON:
+
+For NEON-based memcpy, a significant benefit is seen on the tested Cortex A8
+platform for unaligned copies in cache memory and for aligned and unaligned
+copies in DRAM. Performance for aligned copies in cache memory is relatively
+similar to the optimized non-NEON function.
+
+Results in MB/s on a Cortex A8, with Thumb2 mode enabled, of
+standard libc (Debian unstable), armv7 and NEON optimized memcpy
+variants with line size of 32 bytes:
+
+		libc	armv7	NEON
+test 0		522	549	567
+test 1		329	377	378
+test 2		434	430	513
+test 28		351	361	458
+test 29		246	248	358
+test 43		467	512	581
+
+Test 0 in the benchmark program tests word-aligned requests with
+sizes that are a power of 2 up to 4096 bytes distributed according
+to a power law.
+Test 1 in the benchmark program tests word-aligned requests with
+sizes up to 1024 that are a multiple of 4, distributed according
+to a power law
+Test 2 in the benchmark program tests unaligned requests with sizes
+up to 1023 bytes.
+Test 28 in the benchmark program tests word aligned requests in DRAM
+with sizes up to 1024 bytes.
+Test 29 in the benchmark program tests word aligned requests in DRAM
+with sizes up to 256 bytes.
+Test 43 in the benchmark program tests page aligned requests in DRAM
+of size 4096 (copying a memory page).
