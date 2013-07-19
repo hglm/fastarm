@@ -1514,6 +1514,10 @@ asm_function memcpy_new_neon_line_size_32
 		neon_memcpy_variant 32, 6, 1
 .endfunc
 
+asm_function memcpy_new_neon_line_size_32_auto
+		neon_memcpy_variant 32, 0, 1
+.endfunc
+
 #endif
 
 /*

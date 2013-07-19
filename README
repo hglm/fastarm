@@ -19,7 +19,7 @@ plethora of variants with different preload strategies, block sizes,
 alignment etc.
 
 A benchmark program to compare various memcpy variants is provided. Try
-something like "./benchmark --memcpy ad --all". (Use --memcpy ak on the
+something like "./benchmark --memcpy ad --all". (Use --memcpy al on the
 Raspberry Pi platform).
 
 To compile a memcpy replacement library, set PLATFORM to one of the
