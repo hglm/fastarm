@@ -57,7 +57,7 @@ instead of the one using libfastarm.so.
 Note on cache line size:
 
 Although assuming a preload line size 64 bytes is a little faster on several
-Cortex platforms for small to moderate sizes. However, when accessing DRAM
+Cortex platforms for small to moderate sizes, when accessing DRAM
 with larger sizes assuming 32 byte preloads seems to be faster. On earlier
 Cortex A9 models, 32 byte preloads are required for good performance in all
 cases.
@@ -86,7 +86,7 @@ sizes that are a power of 2 up to 4096 bytes distributed according
 to a power law.
 Test 1 in the benchmark program tests word-aligned requests with
 sizes up to 1024 that are a multiple of 4, distributed according
-to a power law
+to a power law.
 Test 2 in the benchmark program tests unaligned requests with sizes
 up to 1023 bytes.
 Test 28 in the benchmark program tests word aligned requests in DRAM

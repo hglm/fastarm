@@ -1553,7 +1553,11 @@ asm_function memcpy_new_neon_line_size_32_auto
 
 	cmp	r2, #64
 	push 	{r4}
+.if \use_neon == 1
+	blt	10f
+.else
 	ble	10f
+.endif
 .if \write_align > 0
 	ands	r4, r0, #(\write_align - 1)
 .if \use_neon == 1
@@ -1641,7 +1645,7 @@ THUMB(	beq	9f	)
 ARM(	teq	r2, #0	)
 ARM(	beq	9f	)
 	/*
-	 * Handle 8-64 bytes (or 16-64 bytes in case of NEON).
+	 * Handle 8-64 bytes (or 16-63 bytes in case of NEON).
 	 * In case of NEON, destination must be 8-byte aligned.
 	 */
 4:
@@ -1764,7 +1768,7 @@ ARM(	lsr	r4, r4, #1	)
 
 	/*
 	 * Word aligned 8 <= size <= 64
-	 * (16 <= size <= 64 in case of NEON).
+	 * (16 <= size <= 63 in case of NEON).
 	 */
 10:
 	/* Align the destination to an 8 byte boundary. */
