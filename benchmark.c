@@ -79,7 +79,7 @@ static const char *memcpy_variant_name[NU_MEMCPY_VARIANTS] = {
     "libarmmem memcpy",
 #endif
 #ifdef INCLUDE_MEMCPY_HYBRID
-    "cortex-strings memcpy-hybrid",
+    "cortex-strings memcpy-hybrid (NEON)",
 #endif
     "armv5te memcpy",
     "new memcpy for cortex with line size of 32, preload offset of 192",

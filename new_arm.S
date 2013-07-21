@@ -49,6 +49,8 @@
 
 .text
 .syntax unified
+.arch armv7a
+.fpu neon
 
 .macro asm_function function_name
     .global \function_name

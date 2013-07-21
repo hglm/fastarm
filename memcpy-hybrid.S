@@ -43,6 +43,7 @@
 
 	.syntax unified
 	.arch armv7-a
+	.fpu neon
 
 @ this lets us check a flag in a 00/ff byte easily in either endianness
 #ifdef __ARMEB__
